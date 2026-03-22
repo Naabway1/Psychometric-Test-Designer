@@ -20,6 +20,7 @@ namespace Psychometric_Test_Designer.Data
         public DbSet<AnswerOption> AnswerOptions { get; set; }
         public DbSet<UserMetricSnapshot> UserMetricSnapshots { get; set; }
         public DbSet<UserScaleResult> UserScaleResults { get; set; }
+        public DbSet<Token> Tokens { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

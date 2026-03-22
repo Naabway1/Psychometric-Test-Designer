@@ -77,7 +77,7 @@ CREATE TABLE test_scale_metric (
 
 -- Таблица результат шкал 
 CREATE TABLE user_scale_results (
-    id SERIAL PRIMARY KEY,
+    usr_id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
     scale_id INT REFERENCES scales(scale_id) ON DELETE CASCADE,
     raw_score NUMERIC,
@@ -88,10 +88,10 @@ CREATE TABLE user_scale_results (
 
 -- Снапшоты метрик пользователей (раз в N дней)
 CREATE TABLE user_metric_snapshots (
-    id SERIAL PRIMARY KEY,
+    ums_id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
     metric_id INT REFERENCES metrics(metric_id) ON DELETE CASCADE,
-    ums_value NUMERIC,
+    value NUMERIC,
     source_test_id INT REFERENCES tests(test_id),
     created_at TIMESTAMP DEFAULT NOW()
 );

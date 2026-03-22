@@ -29,6 +29,6 @@ namespace Psychometric_Test_Designer.Models
         public Test SourceTest { get; set; }
 
         [Column("created_at")]
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

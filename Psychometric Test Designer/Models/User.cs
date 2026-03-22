@@ -19,7 +19,7 @@ namespace Psychometric_Test_Designer.Models
         public Group Group { get; set; }
 
         [Column("created_at")]
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public List<UserMetric> Metrics { get; set; }
     }

@@ -1,13 +1,15 @@
 -- Таблица групп
 CREATE TABLE groups (
 	group_id VARCHAR(4) PRIMARY KEY,
-	specialization VARCHAR(200)
+	specialization VARCHAR(200),
+    student_count int
 );
 
 -- Таблица токенов
 CREATE TABLE tokens_for_groups (
     token_id varchar(50) PRIMARY KEY,
-    group_id varchar(4) REFERENCES groups(group_id) ON DELETE CASCADE
+    group_id varchar(4) REFERENCES groups(group_id) ON DELETE CASCADE,
+    number_of_uses int
 );
 
 -- Таблица пользователей

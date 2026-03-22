@@ -13,5 +13,8 @@ namespace Psychometric_Test_Designer.Models
         [MaxLength(4)]
         [Column("group_id")]
         public string GroupId { get; set; }
+        public Group Group { get; set; }
+        [Column("number_of_uses")]
+        public int NumberOfUses { get; set; }
     }
 }

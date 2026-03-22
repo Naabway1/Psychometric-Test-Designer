@@ -19,24 +19,38 @@ namespace Psychometric_Test_Designer.Services
 
         public async Task Register(RegisterDto registerDto)
         {
+            using var transaction = await _db.Database.BeginTransactionAsync();
+
             var existsingUser = await _db.Users.AnyAsync(u => u.Login == registerDto.Login);
             if (existsingUser)
             {
                 throw new Exception("Юзер с таким логином уже существует");
             }
 
-            var existingToken = await _db.Tokens.AnyAsync(t => t.TokenId == registerDto.Token);
-            if (!existingToken)
+            var existingToken = await _db.Tokens.FirstOrDefaultAsync(t => t.TokenId == registerDto.Token);
+
+            if (existingToken == null)
             {
-                throw new Exception("Токен регистрации не найден");
+                throw new Exception("Токен регистрации не найден:");
             }
+
+            if (existingToken.NumberOfUses <= 0)
+            {
+                throw new Exception("Токен исчерпан");
+            }
+
+            existingToken.NumberOfUses -= 1;
 
             var user = new User
             {
                 Login = registerDto.Login,
                 Password = _passwordService.HashPassword(registerDto.Password),
-                GroupId = await _db.Tokens.Where(t => t.TokenId == registerDto.Token).Select(t => t.GroupId).FirstOrDefaultAsync()
+                GroupId = existingToken.GroupId
             };
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
 
         public async Task<int?> Login(LoginDto loginDto)

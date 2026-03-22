@@ -4,6 +4,12 @@ CREATE TABLE groups (
 	specialization VARCHAR(200)
 );
 
+-- Таблица токенов
+CREATE TABLE tokens_for_groups (
+    token_id varchar(50) PRIMARY KEY,
+    group_id varchar(4) REFERENCES groups(group_id) ON DELETE CASCADE
+);
+
 -- Таблица пользователей
 CREATE TABLE users (
     user_id SERIAL PRIMARY KEY,

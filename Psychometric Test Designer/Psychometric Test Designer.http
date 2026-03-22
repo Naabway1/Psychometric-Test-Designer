@@ -1,0 +1,6 @@
+@Psychometric_Test_Designer_HostAddress = http://localhost:5186
+
+GET {{Psychometric_Test_Designer_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

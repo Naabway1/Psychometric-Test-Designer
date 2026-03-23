@@ -37,7 +37,7 @@ namespace Psychometric_Test_Designer.Controllers
             }
         }
 
-        [HttpGet("all")]
+        [HttpGet("getAll")]
         public async Task<List<TokenResponseDto>> GetTokens()
         {
             var tokens = await _db.Tokens.Select(t => new TokenResponseDto
@@ -48,6 +48,46 @@ namespace Psychometric_Test_Designer.Controllers
             }).ToListAsync();
 
             return tokens;
+        }
+
+        [HttpDelete("remove")]
+        public async Task<IActionResult> RemoveToken([FromBody] string tokenId)
+        {
+            try
+            {
+                var token = await _db.Tokens.FindAsync(tokenId);
+                if (token == null)
+                {
+                    BadRequest("Токен не был найден");
+                }
+                _db.Tokens.Remove(token);
+                await _db.SaveChangesAsync();
+                return Ok();
+            }
+            catch
+            {
+                return BadRequest("Произошла непредвиденная ошибка");
+            }
+        }
+
+        [HttpPost("editToken")]
+        public async Task<IActionResult> EditToken(string tokenId, int numberOfUses)
+        {
+            try
+            {
+                var token = await _db.Tokens.FindAsync(tokenId);
+                if (token == null)
+                {
+                    return BadRequest("Токен не был найден");
+                }
+                token.NumberOfUses = numberOfUses;
+                await _db.SaveChangesAsync();
+                return Ok();
+            }
+            catch
+            {
+                return BadRequest("Произошла непредвиденная ошибка");
+            }
         }
     }
 }

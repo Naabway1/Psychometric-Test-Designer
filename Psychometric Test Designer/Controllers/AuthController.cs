@@ -4,7 +4,7 @@ using Psychometric_Test_Designer.Services;
 namespace Psychometric_Test_Designer.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/auth")]
     public class AuthController : ControllerBase
     {
         private readonly AuthService _authService;
@@ -17,20 +17,8 @@ namespace Psychometric_Test_Designer.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] DTOs.RegisterDto registerDto)
         {
-            try
-            {
-                await _authService.Register(registerDto);
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new
-                {
-                    message = ex.Message,
-                    inner = ex.InnerException?.Message,
-                    inner2 = ex.InnerException?.InnerException?.Message
-                });
-            }
+            var newUser = await _authService.Register(registerDto);
+            return Ok(newUser);
         }
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] DTOs.LoginDto loginDto)

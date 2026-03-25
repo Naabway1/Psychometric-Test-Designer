@@ -3,91 +3,61 @@ using Psychometric_Test_Designer.Data;
 using Psychometric_Test_Designer.DTOs;
 using Psychometric_Test_Designer.Services;
 using Microsoft.EntityFrameworkCore;
+using Psychometric_Test_Designer.DTOs.Auth;
 
 namespace Psychometric_Test_Designer.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/tokens")]
     public class TokenController : ControllerBase
     {
-        private TokenService _tokenService;
-        private readonly AppDbContext _db;
-        public TokenController(TokenService tokenService, AppDbContext db)
+        private readonly TokenService _tokenService;
+        public TokenController(TokenService tokenService)
         {
             _tokenService = tokenService;
-            _db = db;
         }
 
-        [HttpPost("generate")]
+        [HttpPost]
         public async Task<IActionResult> CreateToken([FromBody] CreateTokenDto dto)
         {
-            try
+            var token = await _tokenService.GenerateToken(dto.GroupId);
+
+            return Ok(new TokenResponseDto
             {
-                var token = await _tokenService.GenerateToken(dto.GroupId);
-                return Ok(new TokenResponseDto
-                {
-                    TokenId = token.TokenId,
-                    GroupId = token.GroupId,
-                    NumberOfUses = token.NumberOfUses
-                });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+                TokenId = token.TokenId,
+                GroupId = token.GroupId,
+                NumberOfUses = token.NumberOfUses
+            });
         }
 
-        [HttpGet("getAll")]
-        public async Task<List<TokenResponseDto>> GetTokens()
+        [HttpGet]
+        public async Task<IActionResult> GetAllTokens()
         {
-            var tokens = await _db.Tokens.Select(t => new TokenResponseDto
+            var tokens = await _tokenService.GetTokens();
+
+            var result = tokens.Select(t => new TokenResponseDto
             {
                 TokenId = t.TokenId,
                 GroupId = t.GroupId,
                 NumberOfUses = t.NumberOfUses
-            }).ToListAsync();
+            }).ToList();
 
-            return tokens;
+            return Ok(result);
         }
 
-        [HttpDelete("remove")]
-        public async Task<IActionResult> RemoveToken([FromBody] string tokenId)
+        [HttpDelete("{tokenId}")]
+        public async Task<IActionResult> RemoveToken([FromRoute] string tokenId)
         {
-            try
-            {
-                var token = await _db.Tokens.FindAsync(tokenId);
-                if (token == null)
-                {
-                    BadRequest("Токен не был найден");
-                }
-                _db.Tokens.Remove(token);
-                await _db.SaveChangesAsync();
-                return Ok();
-            }
-            catch
-            {
-                return BadRequest("Произошла непредвиденная ошибка");
-            }
+            await _tokenService.RemoveToken(tokenId);
+            return Ok();
         }
 
-        [HttpPost("editToken")]
-        public async Task<IActionResult> EditToken(string tokenId, int numberOfUses)
+        [HttpPatch("{tokenId}")]
+        public async Task<IActionResult> EditToken([FromRoute] string tokenId, [FromBody] EditTokenDto dto)
         {
-            try
-            {
-                var token = await _db.Tokens.FindAsync(tokenId);
-                if (token == null)
-                {
-                    return BadRequest("Токен не был найден");
-                }
-                token.NumberOfUses = numberOfUses;
-                await _db.SaveChangesAsync();
-                return Ok();
-            }
-            catch
-            {
-                return BadRequest("Произошла непредвиденная ошибка");
-            }
+            await _tokenService.EditToken(tokenId, dto.NumberOfUses);
+            return Ok();
+
         }
     }
 }

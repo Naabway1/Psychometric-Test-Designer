@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Psychometric_Test_Designer.Data;
 using Psychometric_Test_Designer.DTOs;
+using Psychometric_Test_Designer.DTOs.Auth;
 using Psychometric_Test_Designer.Models;
 
 namespace Psychometric_Test_Designer.Services
@@ -17,7 +18,7 @@ namespace Psychometric_Test_Designer.Services
             _passwordService = passwordService;
         }
 
-        public async Task Register(RegisterDto registerDto)
+        public async Task<AuthResponseDto> Register(RegisterDto registerDto)
         {
             using var transaction = await _db.Database.BeginTransactionAsync();
 
@@ -51,15 +52,16 @@ namespace Psychometric_Test_Designer.Services
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
+            return new AuthResponseDto { UserId = user.UserId };
         }
 
-        public async Task<int?> Login(LoginDto loginDto)
+        public async Task<AuthResponseDto?> Login(LoginDto loginDto)
         {
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Login == loginDto.Login);
             if (user == null) { return null; }
             var valid = _passwordService.VerifyPassword(loginDto.Password, user.Password);
             if (!valid) { return null; }
-            return user.UserId;
+            return new AuthResponseDto { UserId = user.UserId };
         }
     }
 }

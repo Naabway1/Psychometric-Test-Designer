@@ -1,44 +1,86 @@
-﻿using Psychometric_Test_Designer.Core;
+﻿using Microsoft.EntityFrameworkCore;
+using Psychometric_Test_Designer.Core;
 using Psychometric_Test_Designer.Data;
-using Microsoft.EntityFrameworkCore;
+using Psychometric_Test_Designer.Models;
 
 namespace Psychometric_Test_Designer.Services
 {
     public class TokenService
     {
-        private AppDbContext _db;
-        private TokenGenerator _tokenGenerator;
+        private readonly AppDbContext _db;
+        private readonly TokenGenerator _tokenGenerator;
         public TokenService(AppDbContext db, TokenGenerator tokenGenerator)
         {
             _db = db;
             _tokenGenerator = tokenGenerator;
         }
 
-        public async Task<Models.Token> GenerateToken(string groupId)
+        public async Task<Token> GenerateToken(string groupId)
         {
-            var group = await _db.Groups.FirstOrDefaultAsync(g => g.GroupId == groupId);
+            var group = await _db.Groups.FindAsync(groupId);
             if (group == null)
             {
                 throw new Exception("Группа не найдена");
             }
 
-            string token;
-            do
+            try
             {
-                token = _tokenGenerator.Generate();
-            } while (await _db.Tokens.AnyAsync(t => t.TokenId == token));
+                string token;
+                do
+                {
+                    token = _tokenGenerator.Generate();
+                } while (await _db.Tokens.AnyAsync(t => t.TokenId == token));
 
-            var tokenEntity = new Models.Token
+                var tokenEntity = new Token
+                {
+                    TokenId = token,
+                    GroupId = groupId,
+                    NumberOfUses = group.StudentCount
+                };
+
+                _db.Tokens.Add(tokenEntity);
+                await _db.SaveChangesAsync();
+
+                return tokenEntity;
+            }
+            catch (DbUpdateException ex)
             {
-                TokenId = token,
-                GroupId = groupId,
-                NumberOfUses = group.StudentCount
-            };
+                throw new DbUpdateException("Ошибка при сохранении токена в базе данных: ", ex);
+            }
+        }
 
-            _db.Tokens.Add(tokenEntity);
+        public async Task<List<Token>> GetTokens()
+        {
+            var tokens = await _db.Tokens.Select(t => new TokenResponseDto
+            {
+                TokenId = t.TokenId,
+                GroupId = t.GroupId,
+                NumberOfUses = t.NumberOfUses
+            }).ToListAsync();
+
+            return tokens;
+        }
+
+        public async Task RemoveToken(string tokenId)
+        {
+            var token = await _db.Tokens.FindAsync(tokenId);
+            if (token == null)
+            {
+                throw new Exception("Токен не найден");
+            }
+            _db.Tokens.Remove(token);
             await _db.SaveChangesAsync();
+        }
 
-            return tokenEntity;
+        public async Task EditToken(string tokenId, int numberOfUses)
+        {
+            var token = await _db.Tokens.FindAsync(tokenId);
+            if (token == null)
+            {
+                throw new Exception("Токен не найден");
+            }
+            token.NumberOfUses = numberOfUses;
+            await _db.SaveChangesAsync();
         }
     }
 }

@@ -8,14 +8,15 @@ namespace Psychometric_Test_Designer.Models
     {
         [Key]
         [Column("group_id")]
-        public string GroupId { get; set; }
+        public int GroupId { get; set; }
+
+        [Column("group_name")]
+        [MaxLength(4)]
+        public string GroupName { get; set; }
 
         [Column("specialization")]
-        [MaxLength(100)]
+        [MaxLength(200)]
         public string Specialization { get; set; }
-
-        [Column("student_count")]
-        public int StudentCount { get; set; }
         public List<User> Users { get; set; }
     }
 }

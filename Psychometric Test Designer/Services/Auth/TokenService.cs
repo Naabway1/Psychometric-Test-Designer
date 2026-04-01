@@ -35,7 +35,6 @@ namespace Psychometric_Test_Designer.Services
                 {
                     TokenId = token,
                     GroupId = groupId,
-                    NumberOfUses = group.StudentCount
                 };
 
                 _db.Tokens.Add(tokenEntity);
@@ -51,7 +50,7 @@ namespace Psychometric_Test_Designer.Services
 
         public async Task<List<Token>> GetTokens()
         {
-            var tokens = await _db.Tokens.Select(t => new TokenResponseDto
+            var tokens = await _db.Tokens.Select(t => new Token
             {
                 TokenId = t.TokenId,
                 GroupId = t.GroupId,

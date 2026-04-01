@@ -12,6 +12,7 @@ builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TokenGenerator>();
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<GroupService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

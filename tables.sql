@@ -1,90 +1,82 @@
 -- Таблица групп
-CREATE TABLE groups (
-	group_id VARCHAR(4) PRIMARY KEY,
-	specialization VARCHAR(200),
+CREATE TABLE groups IF NOT EXISTS (
+    group_id SERIAL PRIMARY KEY,
+    group_name VARCHAR(100) UNIQUE,
+    specialization VARCHAR(200),
     student_count int
 );
-
 -- Таблица токенов
-CREATE TABLE tokens_for_groups (
+CREATE TABLE tokens_for_groups IF NOT EXISTS (
     token_id varchar(50) PRIMARY KEY,
     group_id varchar(4) REFERENCES groups(group_id) ON DELETE CASCADE,
     number_of_uses int
 );
-
 -- Таблица пользователей
-CREATE TABLE users (
+CREATE TABLE users IF NOT EXISTS (
     user_id SERIAL PRIMARY KEY,
     login VARCHAR(100) UNIQUE,
     password TEXT,
     group_id VARCHAR(4) REFERENCES groups(group_id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT NOW()
 );
-
 -- Таблица метрик (константные)
-CREATE TABLE metrics (
+CREATE TABLE metrics IF NOT EXISTS (
     metric_id SERIAL PRIMARY KEY,
     name VARCHAR(100) UNIQUE,
     description TEXT
 );
-
 -- Таблица шкал
-CREATE TABLE scales (
+CREATE TABLE scales IF NOT EXISTS (
     scale_id SERIAL PRIMARY KEY,
     name VARCHAR(100),
     description TEXT
 );
-
 -- Метрики каждого пользователя
-CREATE TABLE user_metrics (
+CREATE TABLE user_metrics IF NOT EXISTS (
     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
     metric_id INT REFERENCES metrics(metric_id) ON DELETE CASCADE,
     user_metric_value NUMERIC NOT NULL DEFAULT 0,
     PRIMARY KEY(user_id, metric_id)
 );
-
 -- Таблица тестов
-CREATE TABLE tests (
+CREATE TABLE tests IF NOT EXISTS (
     test_id SERIAL PRIMARY KEY,
     title VARCHAR(255),
-    created_by INT REFERENCES users(user_id) SET NULL,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_by INT REFERENCES users(user_id)
+    SET NULL,
+        created_at TIMESTAMP DEFAULT NOW()
 );
-
 -- Таблица вопросов
-CREATE TABLE questions (
+CREATE TABLE questions IF NOT EXISTS (
     question_id SERIAL PRIMARY KEY,
     test_id INT REFERENCES tests(test_id) ON DELETE CASCADE,
     text TEXT NOT NULL
 );
-
 -- Таблица ответов
-CREATE TABLE answers (
+CREATE TABLE answers IF NOT EXISTS (
     answer_id SERIAL PRIMARY KEY,
     question_id INT REFERENCES questions(question_id) ON DELETE CASCADE,
     text TEXT NOT NULL,
     answer_value NUMERIC NOT NULL
 );
-
 -- Связь: вопрос -> шкала
-CREATE TABLE question_scale (
+CREATE TABLE question_scale IF NOT EXISTS (
     question_id INT REFERENCES questions(question_id) ON DELETE CASCADE,
     scale_id INT REFERENCES scales(scale_id) ON DELETE CASCADE,
     weight NUMERIC NOT NULL,
     PRIMARY KEY(question_id, scale_id)
 );
-
 -- Связь: шкала -> метрика (в контексте теста)
-CREATE TABLE test_scale_metric (
+CREATE TABLE test_scale_metric IF NOT EXISTS (
     test_id INT REFERENCES tests(test_id) ON DELETE CASCADE,
     scale_id INT REFERENCES scales(scale_id) ON DELETE CASCADE,
     metric_id INT REFERENCES metrics(metric_id) ON DELETE CASCADE,
-    weight NUMERIC NOT NULL, -- сумма по (test_id, metric_id) = 1 (и только лишь 1)
+    weight NUMERIC NOT NULL,
+    -- сумма по (test_id, metric_id) = 1 (и только лишь 1)
     PRIMARY KEY(test_id, scale_id, metric_id)
 );
-
 -- Таблица результат шкал 
-CREATE TABLE user_scale_results (
+CREATE TABLE user_scale_results IF NOT EXISTS (
     usr_id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
     scale_id INT REFERENCES scales(scale_id) ON DELETE CASCADE,
@@ -93,9 +85,8 @@ CREATE TABLE user_scale_results (
     source_test_id INT REFERENCES tests(test_id),
     created_at TIMESTAMP DEFAULT NOW()
 );
-
 -- Снапшоты метрик пользователей (раз в N дней)
-CREATE TABLE user_metric_snapshots (
+CREATE TABLE user_metric_snapshots IF NOT EXISTS (
     ums_id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
     metric_id INT REFERENCES metrics(metric_id) ON DELETE CASCADE,

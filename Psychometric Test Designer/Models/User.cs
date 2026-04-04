@@ -15,7 +15,7 @@ namespace Psychometric_Test_Designer.Models
         public string Password { get; set; }
 
         [Column("group_id")]
-        public string GroupId { get; set; }
+        public int GroupId { get; set; }
         public Group Group { get; set; }
 
         [Column("created_at")]

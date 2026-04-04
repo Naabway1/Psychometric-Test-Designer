@@ -2,6 +2,6 @@
 {
     public class CreateTokenDto
     {
-        public string GroupId { get; set; }
+        public int GroupId { get; set; }
     }
 }

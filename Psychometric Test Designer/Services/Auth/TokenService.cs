@@ -15,7 +15,7 @@ namespace Psychometric_Test_Designer.Services
             _tokenGenerator = tokenGenerator;
         }
 
-        public async Task<Token> GenerateToken(string groupId)
+        public async Task<Token> GenerateToken(int groupId)
         {
             var group = await _db.Groups.FindAsync(groupId);
             if (group == null)

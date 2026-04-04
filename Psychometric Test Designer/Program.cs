@@ -13,6 +13,9 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TokenGenerator>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<GroupService>();
+builder.Services.AddScoped<TestService>();
+builder.Services.AddScoped<TestProcessingService>();
+builder.Services.AddScoped<UserService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

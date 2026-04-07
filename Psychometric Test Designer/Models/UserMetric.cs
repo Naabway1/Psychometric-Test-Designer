@@ -10,7 +10,7 @@ namespace Psychometric_Test_Designer.Models
         [Column("metric_id")]
         public int MetricId { get; set; }
         [Column("user_metric_value")]
-        public double Value { get; set; }
+        public decimal Value { get; set; }
 
         public User User { get; set; }
         public Metric Metric { get; set; }

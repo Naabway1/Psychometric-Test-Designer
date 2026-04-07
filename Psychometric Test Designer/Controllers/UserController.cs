@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Psychometric_Test_Designer.DTOs;
 using Psychometric_Test_Designer.Services;
+using Psychometric_Test_Designer.Data;
 
 namespace Psychometric_Test_Designer.Controllers
 {
@@ -110,5 +111,23 @@ namespace Psychometric_Test_Designer.Controllers
             }
             return Ok(user);
         }
+        /* 
+        [HttpGet("{userId}/metrics")]
+        public async Task<IActionResult> GetMetrics(int userId)
+        {
+            var metrics = await _db.UserMetrics.Where(um => um.UserId == userId).Join(_db.Metrics,
+            um => um.MetricId,
+            m => m.MetricId,
+            (um, m) => new UserMetricDto
+                {
+                    MetricId = m.MetricId,
+                    MetricName = m.Name,
+                    Value = um.UserMetricValue
+                })
+            .ToListAsync();
+
+            return Ok(metrics);
+        } 
+        */
     }
 }

@@ -20,5 +20,12 @@ namespace Psychometric_Test_Designer.Models
 
         [Column("value")]
         public decimal Value { get; set; }
+
+        [Column("source_test_id")]
+        public int SourceTestId { get; set; }
+        public Test SourceTest { get; set; }
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

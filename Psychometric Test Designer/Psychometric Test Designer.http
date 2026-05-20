@@ -1,6 +1,210 @@
-@Psychometric_Test_Designer_HostAddress = http://localhost:5186
+@host = http://localhost:5186
+@staffToken = PASTE_STAFF_JWT_HERE
+@studentToken = PASTE_STUDENT_JWT_HERE
 
-GET {{Psychometric_Test_Designer_HostAddress}}/weatherforecast/
-Accept: application/json
+### 1. Bootstrap staff account
+POST {{host}}/api/auth/register-staff
+Content-Type: application/json
 
-###
+{
+  "login": "admin",
+  "password": "12345",
+  "groupId": 0,
+  "role": "Admin",
+  "bootstrapKey": "dev-admin-2026"
+}
+
+### 2. Staff login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "12345"
+}
+
+### 3. Create group
+POST {{host}}/api/groups
+Authorization: Bearer {{staffToken}}
+Content-Type: application/json
+
+{
+  "groupName": "D101",
+  "specialization": "Demo specialization",
+  "studentCount": 25
+}
+
+### 4. Create registration token for group
+POST {{host}}/api/tokens
+Authorization: Bearer {{staffToken}}
+Content-Type: application/json
+
+{
+  "groupId": 1,
+  "numberOfUses": 25
+}
+
+### 5. Register student by group token
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "login": "student_demo_1",
+  "password": "12345",
+  "token": "PASTE_GROUP_TOKEN_HERE"
+}
+
+### 6. Student login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "login": "student_demo_1",
+  "password": "12345"
+}
+
+### 7. Create full group climate test
+POST {{host}}/api/tests/full
+Authorization: Bearer {{staffToken}}
+Content-Type: application/json
+
+{
+  "title": "Weekly group climate survey",
+  "createdById": 1,
+  "scales": [
+    {
+      "name": "Stress",
+      "description": "Subjective stress level"
+    },
+    {
+      "name": "Stability",
+      "description": "Emotional stability"
+    }
+  ],
+  "metrics": [
+    {
+      "name": "Stress index",
+      "description": "Final stress metric"
+    },
+    {
+      "name": "Wellbeing index",
+      "description": "Final wellbeing metric"
+    }
+  ],
+  "questions": [
+    {
+      "text": "How strong was your stress today?",
+      "answerOptions": [
+        {
+          "text": "Low",
+          "value": 0
+        },
+        {
+          "text": "Medium",
+          "value": 0.5
+        },
+        {
+          "text": "High",
+          "value": 1
+        }
+      ],
+      "scaleLinks": [
+        {
+          "scaleName": "Stress",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "text": "How calm and confident did you feel?",
+      "answerOptions": [
+        {
+          "text": "Not calm",
+          "value": 0
+        },
+        {
+          "text": "Partly calm",
+          "value": 0.5
+        },
+        {
+          "text": "Fully calm",
+          "value": 1
+        }
+      ],
+      "scaleLinks": [
+        {
+          "scaleName": "Stability",
+          "weight": 1
+        }
+      ]
+    }
+  ],
+  "metricLinks": [
+    {
+      "scaleName": "Stress",
+      "metricName": "Stress index",
+      "weight": 1
+    },
+    {
+      "scaleName": "Stability",
+      "metricName": "Wellbeing index",
+      "weight": 1
+    }
+  ]
+}
+
+### 8. Get full test for frontend
+GET {{host}}/api/tests/1/full
+Authorization: Bearer {{studentToken}}
+
+### 9. Submit test as current student
+POST {{host}}/api/test-processing/submit/me
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{
+  "testId": 1,
+  "answers": [
+    {
+      "questionId": 1,
+      "answerId": 2
+    },
+    {
+      "questionId": 2,
+      "answerId": 6
+    }
+  ]
+}
+
+### 10. Submit text feedback for group NLP trends
+POST {{host}}/api/feedback/me
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{
+  "text": "I feel tired, the workload is high, and some topics are unclear."
+}
+
+### 11. Student personal metrics
+GET {{host}}/api/users/me/metrics
+Authorization: Bearer {{studentToken}}
+
+### 12. Student scale history
+GET {{host}}/api/users/me/scale-results
+Authorization: Bearer {{studentToken}}
+
+### 13. All group risk summaries
+GET {{host}}/api/groups/risk-summary
+Authorization: Bearer {{staffToken}}
+
+### 14. Group metric history for charts
+GET {{host}}/api/groups/1/metric-history
+Authorization: Bearer {{staffToken}}
+
+### 15. Group scale distribution
+GET {{host}}/api/groups/1/scale-distribution
+Authorization: Bearer {{staffToken}}
+
+### 16. Group NLP feedback trends
+GET {{host}}/api/feedback/groups/1/trends
+Authorization: Bearer {{staffToken}}

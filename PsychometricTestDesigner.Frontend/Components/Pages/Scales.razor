@@ -1,0 +1,147 @@
+@page "/scales"
+@inject ApiClient Api
+@inject AuthState Auth
+@inject IJSRuntime JS
+
+<PageTitle>Шкалы</PageTitle>
+
+<div class="page-title">
+    <div>
+        <h1>Визуализация шкал оценивания</h1>
+        <p>Низкие, средние и высокие значения по шкалам выбранной группы.</p>
+    </div>
+    <span class="badge">@Auth.RoleLabel</span>
+</div>
+
+@if (!Auth.IsStaff)
+{
+    <section class="panel">
+        <h2>Доступ для сотрудников</h2>
+        <p>Распределение по группе доступно только сотрудникам.</p>
+    </section>
+}
+else
+{
+    <section class="panel">
+        <div class="field">
+            <label>Группа</label>
+            <select value="@selectedGroupId" @onchange="ChangeGroup">
+                @foreach (var group in groups)
+                {
+                    <option value="@group.GroupId">@RuText.Fix(group.GroupName)</option>
+                }
+            </select>
+        </div>
+    </section>
+
+    <div class="grid cols-2" style="margin-top:14px">
+        <section class="panel">
+            <h2>Распределение</h2>
+            <div class="chart-box tall">
+                <canvas id="scaleDistributionChart"></canvas>
+            </div>
+        </section>
+        <section class="panel">
+            <h2>Средние значения</h2>
+            @foreach (var scale in distribution)
+            {
+                <div class="metric">
+                    <span>@RuText.Fix(scale.ScaleName)</span>
+                    <strong>@Math.Round(scale.AverageValue, 1)</strong>
+                </div>
+            }
+        </section>
+    </div>
+
+    <section class="panel" style="margin-top:14px">
+        <h2>Детализация шкал</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Шкала</th>
+                    <th>Тип</th>
+                    <th>Среднее</th>
+                    <th>Низкие</th>
+                    <th>Средние</th>
+                    <th>Высокие</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var scale in distribution)
+                {
+                    <tr>
+                        <td>@RuText.Fix(scale.ScaleName)</td>
+                        <td>@ScaleType(scale.IsPositive)</td>
+                        <td>@Math.Round(scale.AverageValue, 1)</td>
+                        <td>@scale.LowCount</td>
+                        <td>@scale.MediumCount</td>
+                        <td>@scale.HighCount</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@code {
+    private List<GroupRiskSummary> groups = new();
+    private List<GroupScaleDistribution> distribution = new();
+    private int selectedGroupId;
+    private bool chartsPending;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsStaff)
+        {
+            groups = await Api.GetRiskSummariesAsync();
+            selectedGroupId = groups.FirstOrDefault()?.GroupId ?? 0;
+            await LoadDistribution();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (chartsPending)
+        {
+            chartsPending = false;
+            await RenderChart();
+        }
+    }
+
+    private async Task ChangeGroup(ChangeEventArgs args)
+    {
+        selectedGroupId = int.TryParse(args.Value?.ToString(), out var value) ? value : 0;
+        await LoadDistribution();
+    }
+
+    private async Task LoadDistribution()
+    {
+        distribution = selectedGroupId > 0
+            ? await Api.GetScaleDistributionAsync(selectedGroupId)
+            : new List<GroupScaleDistribution>();
+
+        chartsPending = true;
+    }
+
+    private async Task RenderChart()
+    {
+        await JS.InvokeVoidAsync("ptdCharts.groupedBar", "scaleDistributionChart",
+            distribution.Select(x => RuText.Fix(x.ScaleName)).ToArray(),
+            new[]
+            {
+                new { label = "Низкие", data = distribution.Select(x => x.LowCount).ToArray(), backgroundColor = distribution.Select(x => LevelColor("low", x.IsPositive)).ToArray() },
+                new { label = "Средние", data = distribution.Select(x => x.MediumCount).ToArray(), backgroundColor = distribution.Select(x => LevelColor("medium", x.IsPositive)).ToArray() },
+                new { label = "Высокие", data = distribution.Select(x => x.HighCount).ToArray(), backgroundColor = distribution.Select(x => LevelColor("high", x.IsPositive)).ToArray() }
+            });
+    }
+
+    private static string ScaleType(bool isPositive) => isPositive ? "Позитивная" : "Рисковая";
+
+    private static string LevelColor(string level, bool isPositive) => level switch
+    {
+        "low" => isPositive ? "#ef4444" : "#22c55e",
+        "medium" => "#facc15",
+        "high" => isPositive ? "#22c55e" : "#ef4444",
+        _ => "#8b5cf6"
+    };
+}

@@ -1,0 +1,253 @@
+@page "/student"
+@inject ApiClient Api
+@inject AuthState Auth
+@inject IJSRuntime JS
+
+<PageTitle>Студент</PageTitle>
+
+<div class="page-title">
+    <div>
+        <h1>Личная аналитика студента</h1>
+        <p>Опросы, персональные метрики и обратная связь для анализа групповой динамики.</p>
+    </div>
+    <span class="badge">@Auth.RoleLabel</span>
+</div>
+
+@if (!Auth.IsAuthenticated)
+{
+    <section class="panel">
+        <h2>Нужен вход</h2>
+        <p>Сначала войдите в систему на главном пульте.</p>
+    </section>
+}
+else
+{
+    <div class="grid cols-3">
+        <section class="panel">
+            <h2>Текущие метрики</h2>
+            @if (metrics.Count == 0)
+            {
+                <p>Метрики появятся после прохождения опроса.</p>
+            }
+            @foreach (var metric in metrics)
+            {
+                <div class="metric">
+                    <span>@RuText.Fix(metric.MetricName)</span>
+                    <strong>@Math.Round(metric.Value, 1)</strong>
+                </div>
+            }
+        </section>
+
+        <section class="panel">
+            <h2>Шкалы</h2>
+            <div class="chart-box compact">
+                <canvas id="studentScalesChart"></canvas>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Последний результат</h2>
+            @if (lastResult == null)
+            {
+                <p>После отправки опроса здесь появятся рассчитанные показатели.</p>
+            }
+            else
+            {
+                @foreach (var metric in lastResult.Metrics)
+                {
+                    <div class="metric">
+                        <span>@RuText.Fix(metric.MetricName)</span>
+                        <strong>@Math.Round(metric.EmaValue, 1)</strong>
+                    </div>
+                }
+            }
+        </section>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:14px">
+        <section class="panel">
+            <h2>Пройти опрос</h2>
+            <div class="field">
+                <label>Опрос</label>
+                <select value="@selectedTestId" @onchange="SelectTest">
+                    <option value="0">Выберите доступный опрос</option>
+                    @foreach (var test in tests)
+                    {
+                        <option value="@test.TestId">@RuText.Fix(test.TestTitle) — до @ToLocal(test.ClosesAt).ToString("dd.MM HH:mm")</option>
+                    }
+                </select>
+            </div>
+
+            @if (tests.Count == 0)
+            {
+                <p style="margin-top:12px">Сейчас для вашей группы нет открытых тестов.</p>
+            }
+
+            @if (fullTest != null)
+            {
+                <form @onsubmit="SubmitTest" @onsubmit:preventDefault>
+                    <div class="form-grid" style="margin-top:12px">
+                        @foreach (var question in fullTest.Questions)
+                        {
+                            <div class="panel" style="box-shadow:none">
+                                <h3>@RuText.Fix(question.Text)</h3>
+                                @foreach (var answer in question.AnswerOptions)
+                                {
+                                    <label style="display:flex;gap:10px;align-items:center;margin:6px 0">
+                                        <input type="radio"
+                                               name="@($"q{question.QuestionId}")"
+                                               checked="@IsSelected(question.QuestionId, answer.AnswerId)"
+                                               @onchange="@(() => SelectAnswer(question.QuestionId, answer.AnswerId))" />
+                                        <span>@RuText.Fix(answer.Text)</span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                        <div class="button-row">
+                            <button class="btn-primary" type="submit" disabled="@busy">Отправить ответы</button>
+                        </div>
+                    </div>
+                </form>
+            }
+        </section>
+
+        <section class="panel">
+            <h2>Обратная связь</h2>
+            <form @onsubmit="SubmitFeedback" @onsubmit:preventDefault>
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Что сейчас беспокоит или помогает?</label>
+                        <textarea rows="8" @bind="feedbackText"></textarea>
+                    </div>
+                    <div class="button-row">
+                        <button class="btn-primary" type="submit" disabled="@busy">Отправить</button>
+                    </div>
+                </div>
+            </form>
+            @if (feedbackResult != null)
+            {
+                <div class="metric">
+                    <span>Тональность</span>
+                    <strong>@Math.Round(feedbackResult.SentimentScore, 1)</strong>
+                </div>
+                <p>Темы: @string.Join(", ", feedbackResult.Topics.Select(RuText.Fix))</p>
+            }
+        </section>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(status))
+{
+    <section class="panel" style="margin-top:14px">
+        <span>@status</span>
+    </section>
+}
+
+@code {
+    private readonly Dictionary<int, int> answers = new();
+    private List<TestAssignment> tests = new();
+    private List<UserMetric> metrics = new();
+    private List<UserScaleResult> scaleResults = new();
+    private FullTestResponse? fullTest;
+    private ProcessTestResult? lastResult;
+    private FeedbackResponse? feedbackResult;
+    private int selectedTestId;
+    private string feedbackText = string.Empty;
+    private string? status;
+    private bool busy;
+    private bool chartsPending;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsAuthenticated)
+        {
+            await LoadData();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (chartsPending)
+        {
+            chartsPending = false;
+            await RenderCharts();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        tests = Auth.IsStudent ? await Api.GetAvailableTestsAsync() : new List<TestAssignment>();
+        metrics = await Api.GetMyMetricsAsync();
+        scaleResults = await Api.GetMyScaleResultsAsync();
+        chartsPending = true;
+    }
+
+    private async Task SelectTest(ChangeEventArgs args)
+    {
+        answers.Clear();
+        selectedTestId = int.TryParse(args.Value?.ToString(), out var id) ? id : 0;
+        fullTest = selectedTestId > 0 ? await Api.GetFullTestAsync(selectedTestId) : null;
+    }
+
+    private void SelectAnswer(int questionId, int answerId) => answers[questionId] = answerId;
+
+    private bool IsSelected(int questionId, int answerId) =>
+        answers.TryGetValue(questionId, out var selected) && selected == answerId;
+
+    private async Task SubmitTest()
+    {
+        if (fullTest == null)
+        {
+            return;
+        }
+
+        if (answers.Count != fullTest.Questions.Count)
+        {
+            status = "Ответьте на все вопросы перед отправкой.";
+            return;
+        }
+
+        busy = true;
+        lastResult = await Api.SubmitCurrentUserTestAsync(new SubmitCurrentUserTest
+        {
+            TestId = fullTest.TestId,
+            Answers = answers.Select(x => new SubmitAnswer { QuestionId = x.Key, AnswerId = x.Value }).ToList()
+        });
+        status = lastResult == null ? Api.LastError : "Опрос обработан, метрики обновлены.";
+        await LoadData();
+        busy = false;
+    }
+
+    private async Task SubmitFeedback()
+    {
+        if (string.IsNullOrWhiteSpace(feedbackText))
+        {
+            status = "Введите текст обратной связи.";
+            return;
+        }
+
+        busy = true;
+        feedbackResult = await Api.SubmitFeedbackAsync(feedbackText);
+        status = feedbackResult == null ? Api.LastError : "Обратная связь отправлена.";
+        feedbackText = string.Empty;
+        busy = false;
+    }
+
+    private async Task RenderCharts()
+    {
+        var latest = scaleResults
+            .GroupBy(x => x.ScaleName)
+            .Select(g => g.OrderByDescending(x => x.CreatedAt).First())
+            .OrderBy(x => RuText.Fix(x.ScaleName))
+            .ToList();
+
+        await JS.InvokeVoidAsync("ptdCharts.bar", "studentScalesChart",
+            latest.Select(x => RuText.Fix(x.ScaleName)).ToArray(),
+            latest.Select(x => Math.Round(x.NormalizedScore * 100, 1)).ToArray(),
+            "Значение шкалы");
+    }
+
+    private static DateTime ToLocal(DateTime value) => value.Kind == DateTimeKind.Local
+        ? value
+        : value.AddHours(5);
+}

@@ -1,0 +1,111 @@
+@page "/engagement"
+@inject ApiClient Api
+@inject AuthState Auth
+@inject IJSRuntime JS
+
+<PageTitle>Вовлечённость</PageTitle>
+
+<div class="page-title">
+    <div>
+        <h1>Вовлечённость и социальный климат</h1>
+        <p>Модуль заменяет расписание: оценивает активность, участие в опросах и обратную связь по группам.</p>
+    </div>
+    <span class="badge">@Auth.RoleLabel</span>
+</div>
+
+@if (!Auth.IsStaff)
+{
+    <section class="panel">
+        <h2>Доступ для сотрудников</h2>
+        <p>Этот экран нужен куратору, социальному педагогу и администратору.</p>
+    </section>
+}
+else
+{
+    <div class="grid cols-2">
+        <section class="panel">
+            <h2>Заполнение опросов</h2>
+            <div class="chart-box">
+                <canvas id="engagementFillChart"></canvas>
+            </div>
+        </section>
+        <section class="panel">
+            <h2>Сигналы вовлечённости</h2>
+            @foreach (var item in fillRates.OrderBy(x => FillPercent(x)))
+            {
+                <div class="metric">
+                    <span>@RuText.Fix(item.GroupName)</span>
+                    <strong>@Math.Round(FillPercent(item), 1)%</strong>
+                </div>
+            }
+        </section>
+    </div>
+
+    <section class="panel" style="margin-top:14px">
+        <h2>Таблица социального климата</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Группа</th>
+                    <th>Студентов</th>
+                    <th>Активных</th>
+                    <th>Заполнение</th>
+                    <th>Сообщений</th>
+                    <th>Индекс риска</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rate in fillRates)
+                {
+                    var risk = risks.FirstOrDefault(x => x.GroupId == rate.GroupId);
+                    <tr>
+                        <td>@RuText.Fix(rate.GroupName)</td>
+                        <td>@rate.StudentCount</td>
+                        <td>@rate.ActiveStudents</td>
+                        <td>@Math.Round(FillPercent(rate), 1)%</td>
+                        <td>@rate.FeedbackCount</td>
+                        <td>@(risk == null ? "нет данных" : Math.Round(risk.RiskIndex, 1))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@code {
+    private List<GroupFillRate> fillRates = new();
+    private List<GroupRiskSummary> risks = new();
+    private bool chartsPending;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsStaff)
+        {
+            fillRates = await Api.GetFillRatesAsync();
+            risks = await Api.GetRiskSummariesAsync();
+            chartsPending = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (chartsPending)
+        {
+            chartsPending = false;
+            await JS.InvokeVoidAsync("ptdCharts.bar", "engagementFillChart",
+                fillRates.Select(x => RuText.Fix(x.GroupName)).ToArray(),
+                fillRates.Select(x => Math.Round(FillPercent(x), 1)).ToArray(),
+                "Заполнение, %");
+        }
+    }
+
+    private static decimal FillPercent(GroupFillRate rate)
+    {
+        if (rate.StudentCount <= 0)
+        {
+            return 0;
+        }
+
+        return (decimal)rate.ActiveStudents / rate.StudentCount * 100;
+    }
+}

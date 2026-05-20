@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     user_id SERIAL PRIMARY KEY,
     login VARCHAR(100) UNIQUE,
     password TEXT,
+    role VARCHAR(30) NOT NULL DEFAULT 'Student',
     group_id INT REFERENCES groups(group_id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -23,13 +24,15 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS metrics (
     metric_id SERIAL PRIMARY KEY,
     name VARCHAR(100) UNIQUE,
-    description TEXT
+    description TEXT,
+    is_positive BOOLEAN NOT NULL DEFAULT FALSE
 );
 -- Таблица шкал
 CREATE TABLE IF NOT EXISTS scales (
     scale_id SERIAL PRIMARY KEY,
     name VARCHAR(100),
-    description TEXT
+    description TEXT,
+    is_positive BOOLEAN NOT NULL DEFAULT FALSE
 );
 -- Метрики каждого пользователя
 CREATE TABLE IF NOT EXISTS user_metrics (
@@ -92,5 +95,24 @@ CREATE TABLE IF NOT EXISTS user_metric_snapshots (
     metric_id INT REFERENCES metrics(metric_id) ON DELETE CASCADE,
     value NUMERIC,
     source_test_id INT REFERENCES tests(test_id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS text_feedback (
+    feedback_id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(user_id) ON DELETE SET NULL,
+    group_id INT REFERENCES groups(group_id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    sentiment_score NUMERIC NOT NULL DEFAULT 0,
+    topics TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS test_assignments (
+    assignment_id SERIAL PRIMARY KEY,
+    test_id INT NOT NULL REFERENCES tests(test_id) ON DELETE CASCADE,
+    group_id INT NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
+    opens_at TIMESTAMP NOT NULL,
+    closes_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );

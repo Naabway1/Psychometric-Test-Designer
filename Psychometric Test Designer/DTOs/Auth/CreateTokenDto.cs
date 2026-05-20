@@ -3,5 +3,6 @@
     public class CreateTokenDto
     {
         public int GroupId { get; set; }
+        public int? NumberOfUses { get; set; }
     }
 }

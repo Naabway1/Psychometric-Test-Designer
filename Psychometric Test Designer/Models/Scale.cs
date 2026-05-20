@@ -17,6 +17,9 @@ namespace Psychometric_Test_Designer.Models
         [Column("description")]
         public string Description { get; set; }
 
+        [Column("is_positive")]
+        public bool IsPositive { get; set; }
+
         public List<QuestionScale> QuestionScales { get; set; }
 
         public List<TestScaleMetric> TestScaleMetrics { get; set; }

@@ -14,6 +14,12 @@ namespace Psychometric_Test_Designer.Models
         [MaxLength(100)]
         public string Name { get; set; }
 
+        [Column("description")]
+        public string? Description { get; set; }
+
+        [Column("is_positive")]
+        public bool IsPositive { get; set; }
+
         public List<TestScaleMetric> TestScaleMetrics { get; set; }
     }
 }

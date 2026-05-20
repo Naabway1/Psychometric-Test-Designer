@@ -15,12 +15,18 @@ namespace Psychometric_Test_Designer.Services
             _tokenGenerator = tokenGenerator;
         }
 
-        public async Task<Token> GenerateToken(int groupId)
+        public async Task<Token> GenerateToken(int groupId, int? numberOfUses = null)
         {
             var group = await _db.Groups.FindAsync(groupId);
             if (group == null)
             {
                 throw new Exception("Группа не найдена");
+            }
+
+            var uses = numberOfUses ?? group.StudentCount;
+            if (!uses.HasValue || uses.Value <= 0)
+            {
+                throw new Exception("Укажите количество использований токена или заполните количество студентов в группе");
             }
 
             try
@@ -35,6 +41,7 @@ namespace Psychometric_Test_Designer.Services
                 {
                     TokenId = token,
                     GroupId = groupId,
+                    NumberOfUses = uses.Value
                 };
 
                 _db.Tokens.Add(tokenEntity);

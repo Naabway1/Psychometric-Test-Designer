@@ -1,0 +1,89 @@
+@page "/risks"
+@inject ApiClient Api
+@inject AuthState Auth
+
+<PageTitle>Группы риска</PageTitle>
+
+<div class="page-title">
+    <div>
+        <h1>Прогнозирование групп риска</h1>
+        <p>Приоритеты для куратора строятся по групповым метрикам, а не по раскрытию конкретных студентов.</p>
+    </div>
+    <span class="badge">@Auth.RoleLabel</span>
+</div>
+
+@if (!Auth.IsStaff)
+{
+    <section class="panel">
+        <h2>Доступ для сотрудников</h2>
+        <p>Риски видят только роли администратора и социального педагога.</p>
+    </section>
+}
+else
+{
+    <div class="grid cols-3">
+        <section class="panel">
+            <h2>Критический риск</h2>
+            <div class="metric"><span>Порог</span><strong>75+</strong></div>
+            <p>Нужна быстрая проверка причин: стресс, изоляция, негативная обратная связь.</p>
+        </section>
+        <section class="panel">
+            <h2>Высокий риск</h2>
+            <div class="metric"><span>Порог</span><strong>60+</strong></div>
+            <p>Группа требует внимания и повторного замера после вмешательства.</p>
+        </section>
+        <section class="panel">
+            <h2>Средний риск</h2>
+            <div class="metric"><span>Порог</span><strong>40+</strong></div>
+            <p>Достаточно мониторинга динамики и тем обратной связи.</p>
+        </section>
+    </div>
+
+    <section class="panel" style="margin-top:14px">
+        <h2>Рейтинг групп</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Группа</th>
+                    <th>Индекс</th>
+                    <th>Уровень</th>
+                    <th>Проблемные метрики</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var group in summaries)
+                {
+                    <tr>
+                        <td>@RuText.Fix(group.GroupName)</td>
+                        <td>@Math.Round(group.RiskIndex, 1)</td>
+                        <td><span class="badge">@RuText.RiskLabel(group.RiskLevel)</span></td>
+                        <td>@ProblemMetrics(group)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@code {
+    private List<GroupRiskSummary> summaries = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsStaff)
+        {
+            summaries = await Api.GetRiskSummariesAsync();
+        }
+    }
+
+    private static string ProblemMetrics(GroupRiskSummary group)
+    {
+        var metrics = group.Metrics
+            .OrderByDescending(x => x.AverageValue)
+            .Take(3)
+            .Select(x => $"{RuText.Fix(x.MetricName)}: {Math.Round(x.AverageValue, 1)}");
+
+        return string.Join("; ", metrics);
+    }
+}
+

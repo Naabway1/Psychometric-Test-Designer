@@ -4,6 +4,7 @@
     {
         public int MetricId { get; set; }
         public string MetricName { get; set; }
+        public bool IsPositive { get; set; }
         public decimal Value { get; set; } 
     }
 }

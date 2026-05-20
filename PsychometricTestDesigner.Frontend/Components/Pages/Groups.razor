@@ -1,0 +1,195 @@
+@page "/groups"
+@inject ApiClient Api
+@inject AuthState Auth
+@inject IJSRuntime JS
+
+<PageTitle>Карта групп</PageTitle>
+
+<div class="page-title">
+    <div>
+        <h1>Эмоциональная карта групп</h1>
+        <p>Агрегированная картина состояния учебных групп без раскрытия отдельных студентов.</p>
+    </div>
+    <span class="badge">@Auth.RoleLabel</span>
+</div>
+
+@if (!Auth.IsStaff)
+{
+    <section class="panel">
+        <h2>Доступ для сотрудников</h2>
+        <p>Этот модуль доступен администратору и социальному педагогу.</p>
+    </section>
+}
+else
+{
+    <div class="grid cols-3">
+        @foreach (var group in summaries)
+        {
+            <section class="panel">
+                <h2>@RuText.Fix(group.GroupName)</h2>
+                <div class="metric">
+                    <span>Индекс риска</span>
+                    <strong>@Math.Round(group.RiskIndex, 1)</strong>
+                </div>
+                <div class="metric">
+                    <span>Уровень</span>
+                    <span class="badge">@RuText.RiskLabel(group.RiskLevel)</span>
+                </div>
+                <div class="metric">
+                    <span>Студентов</span>
+                    <strong>@group.UsersCount</strong>
+                </div>
+                <div class="button-row">
+                    <button class="btn-secondary" type="button" @onclick="() => SelectGroup(group.GroupId)">Открыть группу</button>
+                </div>
+            </section>
+        }
+    </div>
+
+    @if (selectedGroup != null)
+    {
+        <div class="grid cols-2" style="margin-top:14px">
+            <section class="panel">
+                <h2>@RuText.Fix(selectedGroup.GroupName): динамика метрик</h2>
+                <div class="chart-box">
+                    <canvas id="groupHistoryChart"></canvas>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>@RuText.Fix(selectedGroup.GroupName): распределение шкал</h2>
+                <div class="chart-box">
+                    <canvas id="groupScaleChart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <section class="panel" style="margin-top:14px">
+            <h2>Средние показатели группы</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Метрика</th>
+                        <th>Тип</th>
+                        <th>Среднее</th>
+                        <th>Студентов в расчете</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var metric in metrics)
+                    {
+                        <tr>
+                            <td>@RuText.Fix(metric.MetricName)</td>
+                            <td>@MetricType(metric.IsPositive)</td>
+                            <td>@Math.Round(metric.AverageValue, 1)</td>
+                            <td>@metric.UsersCount</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
+}
+
+@if (!string.IsNullOrWhiteSpace(status))
+{
+    <section class="panel" style="margin-top:14px">
+        <span>@status</span>
+    </section>
+}
+
+@code {
+    private List<GroupRiskSummary> summaries = new();
+    private List<GroupMetric> metrics = new();
+    private List<GroupMetricHistoryPoint> history = new();
+    private List<GroupScaleDistribution> distribution = new();
+    private GroupRiskSummary? selectedGroup;
+    private string? status;
+    private bool chartsPending;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsStaff)
+        {
+            summaries = await Api.GetRiskSummariesAsync();
+            selectedGroup = summaries.FirstOrDefault();
+            if (selectedGroup != null)
+            {
+                await LoadSelected();
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (chartsPending)
+        {
+            chartsPending = false;
+            await RenderCharts();
+        }
+    }
+
+    private async Task SelectGroup(int groupId)
+    {
+        selectedGroup = summaries.FirstOrDefault(x => x.GroupId == groupId);
+        await LoadSelected();
+    }
+
+    private async Task LoadSelected()
+    {
+        if (selectedGroup == null)
+        {
+            return;
+        }
+
+        metrics = await Api.GetGroupMetricsAsync(selectedGroup.GroupId);
+        history = await Api.GetMetricHistoryAsync(selectedGroup.GroupId);
+        distribution = await Api.GetScaleDistributionAsync(selectedGroup.GroupId);
+        status = Api.LastError;
+        chartsPending = true;
+    }
+
+    private async Task RenderCharts()
+    {
+        var labels = history
+            .Select(x => x.Date.Date)
+            .Distinct()
+            .OrderBy(x => x)
+            .Select(x => x.ToString("dd.MM"))
+            .ToArray();
+
+        var series = history
+            .GroupBy(x => new { Name = RuText.Fix(x.MetricName), x.IsPositive })
+            .Select(g => new
+            {
+                label = g.Key.Name,
+                data = labels.Select(label =>
+                {
+                    var point = g.FirstOrDefault(x => x.Date.ToString("dd.MM") == label);
+                    return point == null ? 0 : Math.Round(point.AverageValue, 1);
+                }).ToArray(),
+                borderColor = g.Key.IsPositive ? "#22c55e" : "#ef4444"
+            }).ToArray();
+
+        await JS.InvokeVoidAsync("ptdCharts.line", "groupHistoryChart", labels, series);
+
+        await JS.InvokeVoidAsync("ptdCharts.groupedBar", "groupScaleChart",
+            distribution.Select(x => RuText.Fix(x.ScaleName)).ToArray(),
+            new[]
+            {
+                new { label = "Низкие", data = distribution.Select(x => x.LowCount).ToArray(), backgroundColor = distribution.Select(x => LevelColor("low", x.IsPositive)).ToArray() },
+                new { label = "Средние", data = distribution.Select(x => x.MediumCount).ToArray(), backgroundColor = distribution.Select(x => LevelColor("medium", x.IsPositive)).ToArray() },
+                new { label = "Высокие", data = distribution.Select(x => x.HighCount).ToArray(), backgroundColor = distribution.Select(x => LevelColor("high", x.IsPositive)).ToArray() }
+            });
+    }
+
+    private static string MetricType(bool isPositive) => isPositive ? "Позитивная" : "Рисковая";
+
+    private static string LevelColor(string level, bool isPositive) => level switch
+    {
+        "low" => isPositive ? "#ef4444" : "#22c55e",
+        "medium" => "#facc15",
+        "high" => isPositive ? "#22c55e" : "#ef4444",
+        _ => "#8b5cf6"
+    };
+}

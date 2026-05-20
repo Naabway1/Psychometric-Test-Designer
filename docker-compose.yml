@@ -18,6 +18,21 @@ services:
       - POSTGRES_PASSWORD=12345
     restart: unless-stopped
 
+  frontend:
+    build:
+      context: "./PsychometricTestDesigner.Frontend"
+      dockerfile: Dockerfile
+    container_name: psychometric-test-designer-frontend
+    depends_on:
+      - app
+    ports:
+      - "5172:80"
+    environment:
+      - ASPNETCORE_URLS=http://+:80
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ApiBaseUrl=http://app:80
+    restart: unless-stopped
+
   db:
     image: postgres:16
     container_name: psychometric-test-designer-db

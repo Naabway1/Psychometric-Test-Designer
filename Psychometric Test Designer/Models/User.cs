@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Psychometric_Test_Designer.Core;
 
 namespace Psychometric_Test_Designer.Models
 {
@@ -13,6 +14,9 @@ namespace Psychometric_Test_Designer.Models
         public string Login { get; set; }
         [Column("password")]
         public string Password { get; set; }
+
+        [Column("role")]
+        public string Role { get; set; } = UserRoles.Student;
 
         [Column("group_id")]
         public int GroupId { get; set; }

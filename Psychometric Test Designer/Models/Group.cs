@@ -17,6 +17,10 @@ namespace Psychometric_Test_Designer.Models
         [Column("specialization")]
         [MaxLength(200)]
         public string Specialization { get; set; }
+
+        [Column("student_count")]
+        public int? StudentCount { get; set; }
+
         public List<User> Users { get; set; }
     }
 }

@@ -1,0 +1,55 @@
+@implements IDisposable
+@inject AuthState Auth
+
+<div class="brand">
+    <div class="brand-mark">IT</div>
+    <div>
+        <strong>КТК</strong>
+        <span>климат учебного коллектива</span>
+    </div>
+</div>
+
+<nav class="nav-list">
+    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Пульт</NavLink>
+
+    @if (Auth.IsStudent)
+    {
+        <NavLink class="nav-link" href="student">Студент</NavLink>
+        <NavLink class="nav-link" href="feedback">Обратная связь</NavLink>
+    }
+
+    @if (Auth.IsStaff)
+    {
+        <NavLink class="nav-link" href="groups">Карта групп</NavLink>
+        <NavLink class="nav-link" href="risks">Группы риска</NavLink>
+        <NavLink class="nav-link" href="engagement">Вовлечённость</NavLink>
+        <NavLink class="nav-link" href="scales">Шкалы</NavLink>
+        <NavLink class="nav-link" href="feedback">NLP-связь</NavLink>
+        <NavLink class="nav-link" href="triggers">Триггеры</NavLink>
+    }
+
+    @if (Auth.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+    {
+        <NavLink class="nav-link" href="admin">Админка</NavLink>
+    }
+</nav>
+
+<div class="side-session">
+    <span>@Auth.RoleLabel</span>
+    <small>@SessionText</small>
+</div>
+
+@code {
+    private string SessionText => $"ID: {Auth.UserId}, группа: {Auth.GroupId}";
+
+    protected override void OnInitialized()
+    {
+        Auth.Changed += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Auth.Changed -= StateHasChanged;
+    }
+}
+

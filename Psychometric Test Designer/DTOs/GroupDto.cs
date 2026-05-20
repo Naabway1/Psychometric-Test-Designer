@@ -4,5 +4,6 @@
     {
         public string GroupName { get; set; }
         public string Specialization { get; set; }
+        public int? StudentCount { get; set; }
     }
 }

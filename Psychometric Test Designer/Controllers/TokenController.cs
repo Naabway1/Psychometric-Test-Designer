@@ -1,17 +1,18 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Psychometric_Test_Designer.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Psychometric_Test_Designer.DTOs;
-using Psychometric_Test_Designer.Services;
-using Microsoft.EntityFrameworkCore;
 using Psychometric_Test_Designer.DTOs.Auth;
+using Psychometric_Test_Designer.Services;
 
 namespace Psychometric_Test_Designer.Controllers
 {
     [ApiController]
+    [Authorize(Policy = "StaffOnly")]
     [Route("api/tokens")]
     public class TokenController : ControllerBase
     {
         private readonly TokenService _tokenService;
+
         public TokenController(TokenService tokenService)
         {
             _tokenService = tokenService;
@@ -20,7 +21,7 @@ namespace Psychometric_Test_Designer.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateToken([FromBody] CreateTokenDto dto)
         {
-            var token = await _tokenService.GenerateToken(dto.GroupId);
+            var token = await _tokenService.GenerateToken(dto.GroupId, dto.NumberOfUses);
 
             return Ok(new TokenResponseDto
             {
@@ -57,7 +58,6 @@ namespace Psychometric_Test_Designer.Controllers
         {
             await _tokenService.EditToken(tokenId, dto.NumberOfUses);
             return Ok();
-
         }
     }
 }

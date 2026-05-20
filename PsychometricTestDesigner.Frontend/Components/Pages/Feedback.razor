@@ -1,0 +1,170 @@
+@page "/feedback"
+@inject ApiClient Api
+@inject AuthState Auth
+@inject IJSRuntime JS
+
+<PageTitle>NLP-связь</PageTitle>
+
+<div class="page-title">
+    <div>
+        <h1>NLP-анализ обратной связи</h1>
+        <p>Темы, тональность и последние сообщения показывают, что беспокоит студентов на уровне группы.</p>
+    </div>
+    <span class="badge">@Auth.RoleLabel</span>
+</div>
+
+@if (!Auth.IsAuthenticated)
+{
+    <section class="panel">
+        <h2>Нужен вход</h2>
+        <p>Войдите как студент или сотрудник.</p>
+    </section>
+}
+else if (Auth.IsStudent)
+{
+    <section class="panel">
+        <h2>Отправить обратную связь</h2>
+        <form @onsubmit="SubmitFeedback" @onsubmit:preventDefault>
+            <div class="form-grid">
+                <div class="field">
+                    <label>Сообщение</label>
+                    <textarea rows="8" @bind="studentFeedback"></textarea>
+                </div>
+                <div class="button-row">
+                    <button class="btn-primary" type="submit" disabled="@busy">Отправить</button>
+                </div>
+            </div>
+        </form>
+    </section>
+}
+else
+{
+    <section class="panel">
+        <div class="field">
+            <label>Группа</label>
+            <select value="@selectedGroupId" @onchange="ChangeGroup">
+                @foreach (var group in groups)
+                {
+                    <option value="@group.GroupId">@RuText.Fix(group.GroupName)</option>
+                }
+            </select>
+        </div>
+    </section>
+
+    @if (trend != null)
+    {
+        <div class="grid cols-3" style="margin-top:14px">
+            <section class="panel">
+                <h2>Сообщений</h2>
+                <div class="metric">
+                    <span>@RuText.Fix(trend.GroupName)</span>
+                    <strong>@trend.TotalMessages</strong>
+                </div>
+            </section>
+            <section class="panel">
+                <h2>Тональность</h2>
+                <div class="metric">
+                    <span>Средняя</span>
+                    <strong>@Math.Round(trend.AverageSentiment, 1)</strong>
+                </div>
+            </section>
+            <section class="panel">
+                <h2>Главные темы</h2>
+                @foreach (var topic in trend.Topics.Take(3))
+                {
+                    <div class="metric">
+                        <span>@RuText.Fix(topic.Topic)</span>
+                        <strong>@topic.Count</strong>
+                    </div>
+                }
+            </section>
+        </div>
+
+        <div class="grid cols-2" style="margin-top:14px">
+            <section class="panel">
+                <h2>Темы обратной связи</h2>
+                <div class="chart-box">
+                    <canvas id="feedbackTopicsChart"></canvas>
+                </div>
+            </section>
+            <section class="panel">
+                <h2>Последние сообщения</h2>
+                @foreach (var message in trend.RecentMessages)
+                {
+                    <div class="panel" style="box-shadow:none;margin-bottom:10px">
+                        <span class="badge">@Math.Round(message.SentimentScore, 1)</span>
+                        <p>@RuText.Fix(message.Text)</p>
+                        <small>@string.Join(", ", message.Topics.Select(RuText.Fix))</small>
+                    </div>
+                }
+            </section>
+        </div>
+    }
+}
+
+@if (!string.IsNullOrWhiteSpace(status))
+{
+    <section class="panel" style="margin-top:14px">
+        <span>@status</span>
+    </section>
+}
+
+@code {
+    private List<GroupRiskSummary> groups = new();
+    private GroupFeedbackTrend? trend;
+    private int selectedGroupId;
+    private string studentFeedback = string.Empty;
+    private string? status;
+    private bool busy;
+    private bool chartsPending;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsStaff)
+        {
+            groups = await Api.GetRiskSummariesAsync();
+            selectedGroupId = groups.FirstOrDefault()?.GroupId ?? 0;
+            await LoadTrend();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (chartsPending && trend != null)
+        {
+            chartsPending = false;
+            await JS.InvokeVoidAsync("ptdCharts.bar", "feedbackTopicsChart",
+                trend.Topics.Select(x => RuText.Fix(x.Topic)).ToArray(),
+                trend.Topics.Select(x => x.Count).ToArray(),
+                "Количество");
+        }
+    }
+
+    private async Task ChangeGroup(ChangeEventArgs args)
+    {
+        selectedGroupId = int.TryParse(args.Value?.ToString(), out var value) ? value : 0;
+        await LoadTrend();
+    }
+
+    private async Task LoadTrend()
+    {
+        trend = selectedGroupId > 0 ? await Api.GetFeedbackTrendAsync(selectedGroupId) : null;
+        status = trend == null ? Api.LastError : null;
+        chartsPending = true;
+    }
+
+    private async Task SubmitFeedback()
+    {
+        if (string.IsNullOrWhiteSpace(studentFeedback))
+        {
+            status = "Введите сообщение.";
+            return;
+        }
+
+        busy = true;
+        var result = await Api.SubmitFeedbackAsync(studentFeedback);
+        status = result == null ? Api.LastError : "Сообщение отправлено.";
+        studentFeedback = string.Empty;
+        busy = false;
+    }
+}

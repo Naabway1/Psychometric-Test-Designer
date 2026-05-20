@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Psychometric_Test_Designer.Data;
 using Psychometric_Test_Designer.DTOs;
+using Psychometric_Test_Designer.Core;
 using Psychometric_Test_Designer.Models;
 
 namespace Psychometric_Test_Designer.Services
@@ -21,6 +22,7 @@ namespace Psychometric_Test_Designer.Services
                 UserId = u.UserId,
                 Login = u.Login,
                 Password = u.Password,
+                Role = u.Role,
                 GroupId = u.GroupId,
                 CreatedAt = u.CreatedAt
             }).ToListAsync();
@@ -74,6 +76,7 @@ namespace Psychometric_Test_Designer.Services
             {
                 Login = dto.Login,
                 Password = dto.Password,
+                Role = UserRoles.Student,
                 GroupId = dto.GroupId
             };
 
@@ -118,6 +121,51 @@ namespace Psychometric_Test_Designer.Services
 
             int result = await _db.SaveChangesAsync();
             return result > 0 ? user : null;
+        }
+
+        public async Task<List<UserMetricDto>> GetUserMetrics(int userId)
+        {
+            var userExists = await _db.Users.AnyAsync(u => u.UserId == userId);
+            if (!userExists)
+            {
+                throw new Exception("Пользователь не найден");
+            }
+
+            return await _db.UserMetrics
+                .Where(um => um.UserId == userId)
+                .Select(um => new UserMetricDto
+                {
+                    MetricId = um.MetricId,
+                    MetricName = um.Metric.Name,
+                    IsPositive = um.Metric.IsPositive,
+                    Value = um.Value
+                })
+                .OrderBy(um => um.MetricId)
+                .ToListAsync();
+        }
+
+        public async Task<List<UserScaleResultDto>> GetUserScaleResults(int userId)
+        {
+            var userExists = await _db.Users.AnyAsync(u => u.UserId == userId);
+            if (!userExists)
+            {
+                throw new Exception("Пользователь не найден");
+            }
+
+            return await _db.UserScaleResults
+                .Where(usr => usr.UserId == userId)
+                .OrderByDescending(usr => usr.CreatedAt)
+                .Select(usr => new UserScaleResultDto
+                {
+                    ScaleId = usr.ScaleId,
+                    ScaleName = usr.Scale.Name,
+                    IsPositive = usr.Scale.IsPositive,
+                    RawScore = usr.RawScore,
+                    NormalizedScore = usr.NormalizedScore,
+                    SourceTestId = usr.SourceTestId,
+                    CreatedAt = usr.CreatedAt
+                })
+                .ToListAsync();
         }
     }
 }

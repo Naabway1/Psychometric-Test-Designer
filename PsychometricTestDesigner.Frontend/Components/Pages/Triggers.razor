@@ -1,0 +1,123 @@
+@page "/triggers"
+@inject ApiClient Api
+@inject AuthState Auth
+
+<PageTitle>Триггеры</PageTitle>
+
+<div class="page-title">
+    <div>
+        <h1>Уведомления и триггеры</h1>
+        <p>Система подсвечивает группы, где метрики и интегральный риск требуют внимания.</p>
+    </div>
+    <span class="badge">@Auth.RoleLabel</span>
+</div>
+
+@if (!Auth.IsStaff)
+{
+    <section class="panel">
+        <h2>Доступ для сотрудников</h2>
+        <p>Триггеры предназначены для куратора, социального педагога и администратора.</p>
+    </section>
+}
+else
+{
+    <div class="grid cols-3">
+        <section class="panel">
+            <h2>Активных сигналов</h2>
+            <div class="metric"><span>Всего</span><strong>@VisibleAlerts.Count</strong></div>
+        </section>
+        <section class="panel">
+            <h2>Критичные</h2>
+            <div class="metric"><span>Срочно</span><strong>@VisibleAlerts.Count(x => x.Severity == "critical")</strong></div>
+        </section>
+        <section class="panel">
+            <h2>Предупреждения</h2>
+            <div class="metric"><span>Мониторинг</span><strong>@VisibleAlerts.Count(x => x.Severity != "critical")</strong></div>
+        </section>
+    </div>
+
+    <section class="panel" style="margin-top:14px">
+        <h2>Очередь внимания</h2>
+        @if (VisibleAlerts.Count == 0)
+        {
+            <p>Сейчас нет активных сигналов по настроенным порогам.</p>
+        }
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Группа</th>
+                    <th>Сигнал</th>
+                    <th>Значение</th>
+                    <th>Порог</th>
+                    <th>Важность</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var alert in VisibleAlerts)
+                {
+                    <tr>
+                        <td>@RuText.Fix(alert.GroupName)</td>
+                        <td>@RuText.Fix(alert.MetricName)</td>
+                        <td>@Math.Round(alert.CurrentValue, 1)</td>
+                        <td>@Math.Round(alert.Threshold, 1)</td>
+                        <td><span class="badge">@RuText.SeverityLabel(alert.Severity)</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@code {
+    private List<TriggerAlert> apiAlerts = new();
+    private List<GroupRiskSummary> risks = new();
+
+    private List<TriggerAlert> VisibleAlerts
+    {
+        get
+        {
+            var alerts = apiAlerts
+                .Select(x => new TriggerAlert
+                {
+                    GroupId = x.GroupId,
+                    GroupName = RuText.Fix(x.GroupName),
+                    MetricName = RuText.Fix(x.MetricName),
+                    CurrentValue = x.CurrentValue,
+                    Threshold = x.Threshold,
+                    Severity = x.Severity,
+                    Message = RuText.Fix(x.Message)
+                })
+                .ToList();
+
+            alerts.AddRange(risks
+                .Where(x => x.RiskIndex >= 60)
+                .Select(x => new TriggerAlert
+                {
+                    GroupId = x.GroupId,
+                    GroupName = RuText.Fix(x.GroupName),
+                    MetricName = "Интегральный риск",
+                    CurrentValue = x.RiskIndex,
+                    Threshold = x.RiskIndex >= 75 ? 75 : 60,
+                    Severity = x.RiskIndex >= 75 ? "critical" : "warning",
+                    Message = string.Empty
+                }));
+
+            return alerts
+                .GroupBy(x => $"{x.GroupId}:{x.MetricName}")
+                .Select(g => g.OrderByDescending(x => x.CurrentValue).First())
+                .OrderByDescending(x => x.Severity == "critical")
+                .ThenByDescending(x => x.CurrentValue)
+                .ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsStaff)
+        {
+            apiAlerts = await Api.GetAlertsAsync();
+            risks = await Api.GetRiskSummariesAsync();
+        }
+    }
+}
+

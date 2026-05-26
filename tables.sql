@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS tokens_for_groups (
 CREATE TABLE IF NOT EXISTS users (
     user_id SERIAL PRIMARY KEY,
     login VARCHAR(100) UNIQUE,
+    full_name VARCHAR(200) NOT NULL DEFAULT '',
     password TEXT,
     role VARCHAR(30) NOT NULL DEFAULT 'Student',
     group_id INT REFERENCES groups(group_id) ON DELETE CASCADE,
@@ -115,4 +116,9 @@ CREATE TABLE IF NOT EXISTS test_assignments (
     opens_at TIMESTAMP NOT NULL,
     closes_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS app_seed_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );

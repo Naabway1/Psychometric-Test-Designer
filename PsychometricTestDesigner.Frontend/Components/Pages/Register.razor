@@ -2,6 +2,7 @@
 @inject ApiClient Api
 @inject AuthState Auth
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Регистрация</PageTitle>
 
@@ -9,17 +10,26 @@
 {
     <div class="auth-page">
         <section class="panel auth-card">
-            <div class="brand auth-brand">
-                <div class="brand-mark">IT</div>
-                <div>
-                    <strong>ГБПОУ "КТК"</strong>
-                    <span>Система анализа климата в учебном коллективе</span>
+            <div class="auth-card-head">
+                <div class="brand auth-brand">
+                    <div class="brand-mark">IT</div>
+                    <div>
+                        <strong>ГБПОУ "КТК"</strong>
+                        <span>Система анализа климата в учебном коллективе</span>
+                    </div>
                 </div>
+                <button class="icon-button theme-toggle" type="button" title="@ThemeButtonTitle" aria-label="@ThemeButtonTitle" @onclick="ToggleTheme">
+                    <span aria-hidden="true">@ThemeIcon</span>
+                </button>
             </div>
 
             <h1>Регистрация</h1>
             <form @onsubmit="RegisterAsync" @onsubmit:preventDefault>
                 <div class="form-grid">
+                    <div class="field">
+                        <label>ФИО</label>
+                        <input @bind="register.FullName" autocomplete="name" />
+                    </div>
                     <div class="field">
                         <label>Логин</label>
                         <input @bind="register.Login" autocomplete="username" />
@@ -32,8 +42,9 @@
                         <label>Код приглашения</label>
                         <input @bind="register.Token" autocomplete="off" />
                     </div>
-                    <div class="button-row">
+                    <div class="auth-actions">
                         <button class="btn-primary" type="submit" disabled="@busy">Зарегистрироваться</button>
+                        <a class="btn-secondary" href="/">Войти</a>
                     </div>
                 </div>
             </form>
@@ -47,14 +58,13 @@
 }
 else
 {
-    <PageTitle>Пульт системы</PageTitle>
+    <PageTitle>Панель управления</PageTitle>
 
     <div class="page-title">
         <div>
-            <h1>Пульт системы</h1>
+            <h1>Панель управления</h1>
             <p>Доступные разделы зависят от вашей роли в системе.</p>
         </div>
-        <span class="badge">@Auth.RoleLabel</span>
     </div>
 
     <div class="grid cols-3">
@@ -80,27 +90,32 @@ else
     {
         get
         {
-            yield return ("Пульт", "Главный экран с доступными модулями системы.", "/");
+            yield return ("Панель управления", "Главный экран с доступными разделами системы.", "/");
 
             if (Auth.IsStudent)
             {
-                yield return ("Личная аналитика", "Опросы, персональные шкалы, метрики и вклад в состояние группы.", "/student");
+                yield return ("Личный кабинет", "Доступные тестирования, персональные шкалы и текущие метрики.", "/student");
                 yield return ("Обратная связь", "Сообщение о состоянии, проблемах или поддерживающих факторах.", "/feedback");
             }
 
-            if (Auth.IsStaff)
+            if (Auth.IsPsychologist)
             {
-                yield return ("Эмоциональная карта", "Агрегированное состояние учебных групп без раскрытия отдельных студентов.", "/groups");
+                yield return ("Аналитика групп", "Агрегированные показатели учебных групп и динамика метрик.", "/groups");
                 yield return ("Группы риска", "Ранжирование групп по интегральному риску и проблемным метрикам.", "/risks");
-                yield return ("Вовлечённость", "Активность, заполнение опросов и социальный климат вместо модуля расписания.", "/engagement");
-                yield return ("Шкалы", "Распределение низких, средних и высоких значений по шкалам.", "/scales");
-                yield return ("NLP-связь", "Темы, тональность и последние сообщения обратной связи.", "/feedback");
-                yield return ("Триггеры", "Автоматические сигналы, когда показатели группы переходят пороги.", "/triggers");
+                yield return ("Вовлеченность", "Активность прохождения тестов и социальный климат по группам.", "/engagement");
+                yield return ("Шкалы и результаты", "Распределение шкал и индивидуальные сводки студентов.", "/scales");
+                yield return ("Обратная связь", "Темы, тональность и последние сообщения студентов.", "/feedback");
+                yield return ("Сигналы внимания", "Автоматические сигналы, когда показатели группы переходят пороги.", "/triggers");
             }
 
-            if (Auth.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            if (Auth.CanManageTests)
             {
-                yield return ("Админка", "Группы, токены регистрации и демо-опрос для защиты.", "/admin");
+                yield return ("Конструктор тестов", "Создание тестов, шкал, метрик и настройка доступности.", "/tests");
+            }
+
+            if (Auth.IsAdmin)
+            {
+                yield return ("Администрирование", "Группы и коды регистрации без доступа к психологическим результатам.", "/admin");
             }
         }
     }
@@ -122,5 +137,23 @@ else
         }
 
         busy = false;
+    }
+
+    private string theme = "dark";
+    private string ThemeIcon => theme == "light" ? "☀" : "☾";
+    private string ThemeButtonTitle => theme == "light" ? "Включить темную тему" : "Включить светлую тему";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            theme = await JS.InvokeAsync<string>("ptdTheme.get");
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        theme = await JS.InvokeAsync<string>("ptdTheme.toggle");
     }
 }

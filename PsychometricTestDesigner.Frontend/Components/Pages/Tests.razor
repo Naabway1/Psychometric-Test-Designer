@@ -1,0 +1,456 @@
+@page "/tests"
+@inject ApiClient Api
+@inject AuthState Auth
+
+<PageTitle>Конструктор тестов</PageTitle>
+
+<div class="page-title">
+    <div>
+        <h1>Конструктор тестов</h1>
+        <p>Создание опросов, шкал, метрик и настройка доступности для учебных групп.</p>
+    </div>
+</div>
+
+@if (!Auth.CanManageTests)
+{
+    <section class="panel">
+        <h2>Доступ ограничен</h2>
+        <p>Создание и настройка тестов доступны администратору и психологу.</p>
+    </section>
+}
+else
+{
+    <section class="panel">
+        <h2>Новый тест</h2>
+        <form @onsubmit="CreateTest" @onsubmit:preventDefault>
+            <div class="form-grid">
+                <div class="field">
+                    <label>Название теста</label>
+                    <input @bind="testTitle" />
+                </div>
+
+                <div class="builder-section">
+                    <div class="section-head">
+                        <h3>Шкалы</h3>
+                        <button class="btn-secondary" type="button" @onclick="AddScale">Добавить шкалу</button>
+                    </div>
+                    @foreach (var scale in scales)
+                    {
+                        <div class="builder-row">
+                            <div class="field">
+                                <label>Название</label>
+                                <input @bind="scale.Name" />
+                            </div>
+                            <div class="field">
+                                <label>Описание</label>
+                                <input @bind="scale.Description" />
+                            </div>
+                            <div class="field">
+                                <label>Тип</label>
+                                <select @bind="scale.IsPositive">
+                                    <option value="false">Рисковая</option>
+                                    <option value="true">Позитивная</option>
+                                </select>
+                            </div>
+                            <button class="icon-button danger-button" title="Удалить шкалу" type="button" @onclick="() => RemoveScale(scale)">×</button>
+                        </div>
+                    }
+                </div>
+
+                <div class="builder-section">
+                    <div class="section-head">
+                        <h3>Метрики</h3>
+                        <button class="btn-secondary" type="button" @onclick="AddMetric">Добавить метрику</button>
+                    </div>
+                    @foreach (var metric in metrics)
+                    {
+                        <div class="builder-row">
+                            <div class="field">
+                                <label>Название</label>
+                                <input @bind="metric.Name" />
+                            </div>
+                            <div class="field">
+                                <label>Описание</label>
+                                <input @bind="metric.Description" />
+                            </div>
+                            <div class="field">
+                                <label>Тип</label>
+                                <select @bind="metric.IsPositive">
+                                    <option value="false">Рисковая</option>
+                                    <option value="true">Позитивная</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Основная шкала</label>
+                                <select @bind="metric.ScaleName">
+                                    @foreach (var scale in scales)
+                                    {
+                                        <option value="@scale.Name">@scale.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <button class="icon-button danger-button" title="Удалить метрику" type="button" @onclick="() => RemoveMetric(metric)">×</button>
+                        </div>
+                    }
+                </div>
+
+                <div class="builder-section">
+                    <div class="section-head">
+                        <h3>Вопросы</h3>
+                        <button class="btn-secondary" type="button" @onclick="AddQuestion">Добавить вопрос</button>
+                    </div>
+                    @foreach (var question in questions)
+                    {
+                        <div class="question-editor">
+                            <div class="builder-row">
+                                <div class="field">
+                                    <label>Текст вопроса</label>
+                                    <input @bind="question.Text" />
+                                </div>
+                                <div class="field">
+                                    <label>Шкала вопроса</label>
+                                    <select @bind="question.ScaleName">
+                                        @foreach (var scale in scales)
+                                        {
+                                            <option value="@scale.Name">@scale.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                <button class="icon-button danger-button" title="Удалить вопрос" type="button" @onclick="() => RemoveQuestion(question)">×</button>
+                            </div>
+                            <div class="answer-grid">
+                                @foreach (var answer in question.Answers)
+                                {
+                                    <div class="field">
+                                        <label>Ответ, значение @answer.Value</label>
+                                        <input @bind="answer.Text" />
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="button-row">
+                    <button class="btn-primary" type="submit" disabled="@busy">Создать тест</button>
+                </div>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel" style="margin-top:14px">
+        <h2>Открыть тест для группы</h2>
+        <form @onsubmit="CreateAssignment" @onsubmit:preventDefault>
+            <div class="grid cols-2">
+                <div class="field">
+                    <label>Тест</label>
+                    <select @bind="assignmentRequest.TestId">
+                        <option value="0">Выберите тест</option>
+                        @foreach (var test in tests)
+                        {
+                            <option value="@test.TestId">@RuText.Fix(test.Title)</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Группа</label>
+                    <select @bind="assignmentRequest.GroupId">
+                        @foreach (var group in groups)
+                        {
+                            <option value="@group.GroupId">@RuText.Fix(group.GroupName)</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Открыть</label>
+                    <input type="datetime-local" value="@opensAtText" @onchange="ChangeOpensAt" />
+                </div>
+                <div class="field">
+                    <label>Закрыть</label>
+                    <input type="datetime-local" value="@closesAtText" @onchange="ChangeClosesAt" />
+                </div>
+            </div>
+            <div class="button-row">
+                <button class="btn-primary" type="submit" disabled="@busy">Открыть доступ</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel" style="margin-top:14px">
+        <h2>Назначенные тесты</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Тест</th>
+                    <th>Группа</th>
+                    <th>Открыт</th>
+                    <th>Закрыт</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var assignment in assignments)
+                {
+                    <tr>
+                        <td>@RuText.Fix(assignment.TestTitle)</td>
+                        <td>@RuText.Fix(assignment.GroupName)</td>
+                        <td>@ToLocal(assignment.OpensAt).ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@ToLocal(assignment.ClosesAt).ToString("dd.MM.yyyy HH:mm")</td>
+                        <td><span class="badge">@(assignment.IsActive ? "Открыт" : "Закрыт")</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@if (!string.IsNullOrWhiteSpace(status))
+{
+    <section class="panel" style="margin-top:14px">
+        <span>@status</span>
+    </section>
+}
+
+@code {
+    private string testTitle = "Опрос состояния учебной группы";
+    private readonly List<ScaleDraft> scales = new();
+    private readonly List<MetricDraft> metrics = new();
+    private readonly List<QuestionDraft> questions = new();
+    private List<GroupDto> groups = new();
+    private List<TestSummary> tests = new();
+    private List<TestAssignment> assignments = new();
+    private CreateTestAssignment assignmentRequest = new();
+    private string opensAtText = LocalNow.AddHours(-1).ToString("yyyy-MM-ddTHH:mm");
+    private string closesAtText = LocalNow.AddDays(7).ToString("yyyy-MM-ddTHH:mm");
+    private string? status;
+    private bool busy;
+
+    private static DateTime LocalNow => DateTime.UtcNow.AddHours(5);
+
+    protected override async Task OnInitializedAsync()
+    {
+        SeedDraft();
+        if (Auth.CanManageTests)
+        {
+            await Load();
+        }
+    }
+
+    private async Task Load()
+    {
+        groups = await Api.GetGroupsAsync();
+        tests = await Api.GetTestsAsync();
+        assignments = await Api.GetTestAssignmentsAsync();
+        assignmentRequest.GroupId = groups.FirstOrDefault()?.GroupId ?? assignmentRequest.GroupId;
+        assignmentRequest.TestId = tests.FirstOrDefault()?.TestId ?? assignmentRequest.TestId;
+    }
+
+    private async Task CreateTest()
+    {
+        if (!ValidateDraft())
+        {
+            return;
+        }
+
+        busy = true;
+        var request = new CreateFullTest
+        {
+            Title = testTitle,
+            CreatedById = Auth.UserId,
+            Scales = scales.Select(scale => new ScaleDefinition
+            {
+                Name = scale.Name,
+                Description = scale.Description,
+                IsPositive = scale.IsPositive
+            }).ToList(),
+            Metrics = metrics.Select(metric => new MetricDefinition
+            {
+                Name = metric.Name,
+                Description = metric.Description,
+                IsPositive = metric.IsPositive
+            }).ToList(),
+            Questions = questions.Select(question => new CreateFullQuestion
+            {
+                Text = question.Text,
+                ScaleLinks = [new QuestionScaleLink { ScaleName = question.ScaleName, Weight = 1 }],
+                AnswerOptions = question.Answers
+                    .Select(answer => new CreateAnswerOption { Text = answer.Text, Value = answer.Value })
+                    .ToList()
+            }).ToList(),
+            MetricLinks = metrics.Select(metric => new TestScaleMetricLink
+            {
+                ScaleName = metric.ScaleName,
+                MetricName = metric.Name,
+                Weight = 1
+            }).ToList()
+        };
+
+        var result = await Api.CreateFullTestAsync(request);
+        status = result == null ? Api.LastError : $"Тест «{RuText.Fix(result.Title)}» создан.";
+        if (result != null)
+        {
+            assignmentRequest.TestId = result.TestId;
+        }
+        await Load();
+        busy = false;
+    }
+
+    private async Task CreateAssignment()
+    {
+        if (!DateTime.TryParse(opensAtText, out var opensAt) || !DateTime.TryParse(closesAtText, out var closesAt))
+        {
+            status = "Проверьте даты открытия и закрытия.";
+            return;
+        }
+
+        busy = true;
+        assignmentRequest.OpensAt = opensAt;
+        assignmentRequest.ClosesAt = closesAt;
+        var result = await Api.CreateTestAssignmentAsync(assignmentRequest);
+        status = result == null
+            ? Api.LastError
+            : $"Тест «{RuText.Fix(result.TestTitle)}» открыт для группы {RuText.Fix(result.GroupName)}.";
+        await Load();
+        busy = false;
+    }
+
+    private bool ValidateDraft()
+    {
+        if (string.IsNullOrWhiteSpace(testTitle))
+        {
+            status = "Укажите название теста.";
+            return false;
+        }
+
+        if (scales.Any(scale => string.IsNullOrWhiteSpace(scale.Name))
+            || metrics.Any(metric => string.IsNullOrWhiteSpace(metric.Name) || string.IsNullOrWhiteSpace(metric.ScaleName))
+            || questions.Any(question => string.IsNullOrWhiteSpace(question.Text) || string.IsNullOrWhiteSpace(question.ScaleName)))
+        {
+            status = "Заполните названия шкал, метрик и вопросы.";
+            return false;
+        }
+
+        if (questions.Any(question => question.Answers.Any(answer => string.IsNullOrWhiteSpace(answer.Text))))
+        {
+            status = "Заполните все варианты ответов.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private void SeedDraft()
+    {
+        if (scales.Count > 0)
+        {
+            return;
+        }
+
+        scales.Add(new() { Name = "Тревожность", Description = "Субъективное напряжение и частые переживания" });
+        scales.Add(new() { Name = "Поддержка группы", Description = "Ощущение помощи и принятия", IsPositive = true });
+        metrics.Add(new() { Name = "Индекс тревожности", Description = "Групповой уровень тревожности", ScaleName = scales[0].Name });
+        metrics.Add(new() { Name = "Индекс поддержки", Description = "Позитивная поддержка в группе", IsPositive = true, ScaleName = scales[1].Name });
+        questions.Add(CreateQuestion("В последние дни я часто испытываю тревогу из-за учебы.", scales[0].Name));
+        questions.Add(CreateQuestion("Я чувствую поддержку со стороны одногруппников.", scales[1].Name));
+    }
+
+    private static QuestionDraft CreateQuestion(string text, string scaleName) => new()
+    {
+        Text = text,
+        ScaleName = scaleName,
+        Answers =
+        [
+            new() { Text = "Совсем не согласен(на)", Value = 0m },
+            new() { Text = "Скорее не согласен(на)", Value = 0.33m },
+            new() { Text = "Скорее согласен(на)", Value = 0.66m },
+            new() { Text = "Полностью согласен(на)", Value = 1m }
+        ]
+    };
+
+    private void AddScale() => scales.Add(new() { Name = $"Новая шкала {scales.Count + 1}" });
+
+    private void RemoveScale(ScaleDraft scale)
+    {
+        if (scales.Count <= 1)
+        {
+            status = "В тесте должна остаться хотя бы одна шкала.";
+            return;
+        }
+
+        scales.Remove(scale);
+        foreach (var metric in metrics.Where(metric => metric.ScaleName == scale.Name))
+        {
+            metric.ScaleName = scales.First().Name;
+        }
+        foreach (var question in questions.Where(question => question.ScaleName == scale.Name))
+        {
+            question.ScaleName = scales.First().Name;
+        }
+    }
+
+    private void AddMetric() => metrics.Add(new()
+    {
+        Name = $"Новая метрика {metrics.Count + 1}",
+        ScaleName = scales.FirstOrDefault()?.Name ?? string.Empty
+    });
+
+    private void RemoveMetric(MetricDraft metric)
+    {
+        if (metrics.Count <= 1)
+        {
+            status = "В тесте должна остаться хотя бы одна метрика.";
+            return;
+        }
+
+        metrics.Remove(metric);
+    }
+
+    private void AddQuestion() => questions.Add(CreateQuestion($"Новый вопрос {questions.Count + 1}", scales.FirstOrDefault()?.Name ?? string.Empty));
+
+    private void RemoveQuestion(QuestionDraft question)
+    {
+        if (questions.Count <= 1)
+        {
+            status = "В тесте должен остаться хотя бы один вопрос.";
+            return;
+        }
+
+        questions.Remove(question);
+    }
+
+    private void ChangeOpensAt(ChangeEventArgs args) => opensAtText = args.Value?.ToString() ?? string.Empty;
+
+    private void ChangeClosesAt(ChangeEventArgs args) => closesAtText = args.Value?.ToString() ?? string.Empty;
+
+    private static DateTime ToLocal(DateTime value) => value.Kind == DateTimeKind.Local
+        ? value
+        : value.AddHours(5);
+
+    private sealed class ScaleDraft
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public bool IsPositive { get; set; }
+    }
+
+    private sealed class MetricDraft
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public bool IsPositive { get; set; }
+        public string ScaleName { get; set; } = string.Empty;
+    }
+
+    private sealed class QuestionDraft
+    {
+        public string Text { get; set; } = string.Empty;
+        public string ScaleName { get; set; } = string.Empty;
+        public List<AnswerDraft> Answers { get; set; } = new();
+    }
+
+    private sealed class AnswerDraft
+    {
+        public string Text { get; set; } = string.Empty;
+        public decimal Value { get; set; }
+    }
+}

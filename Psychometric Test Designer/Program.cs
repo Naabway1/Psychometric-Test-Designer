@@ -8,6 +8,9 @@ using Psychometric_Test_Designer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddScoped<PasswordService>();
@@ -47,7 +50,13 @@ builder.Services
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("StaffOnly", policy =>
-        policy.RequireRole(UserRoles.Admin, UserRoles.SocialTeacher));
+        policy.RequireRole(UserRoles.Admin, UserRoles.Psychologist, UserRoles.SocialTeacher));
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireRole(UserRoles.Admin));
+    options.AddPolicy("PsychologistOnly", policy =>
+        policy.RequireRole(UserRoles.Psychologist));
+    options.AddPolicy("TestManagement", policy =>
+        policy.RequireRole(UserRoles.Admin, UserRoles.Psychologist));
 });
 
 builder.Services.AddEndpointsApiExplorer();

@@ -250,7 +250,8 @@ namespace Psychometric_Test_Designer.Services
             int testId,
             Dictionary<int, decimal> metrics)
         {
-            const decimal alpha = 0.7m;
+            const decimal alpha = 0.35m;
+            var createdAt = DateTime.UtcNow;
 
             var metricIds = metrics.Keys.ToList();
             var metricMeta = await _db.Metrics
@@ -279,7 +280,7 @@ namespace Psychometric_Test_Designer.Services
                 }
                 else
                 {
-                    existing.Value = existing.Value * alpha + metric.Value * (1 - alpha);
+                    existing.Value = metric.Value * alpha + existing.Value * (1 - alpha);
                     emaValue = existing.Value;
                 }
 
@@ -287,9 +288,9 @@ namespace Psychometric_Test_Designer.Services
                 {
                     UserId = userId,
                     MetricId = metric.Key,
-                    Value = emaValue,
+                    Value = metric.Value,
                     SourceTestId = testId,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = createdAt
                 });
 
                 result.Add(new ProcessedMetricResultDto
@@ -316,6 +317,7 @@ namespace Psychometric_Test_Designer.Services
                 .ToDictionaryAsync(s => s.ScaleId, s => new { s.Name, s.IsPositive });
 
             var result = new List<ProcessedScaleResultDto>();
+            var createdAt = DateTime.UtcNow;
 
             foreach (var scale in raw)
             {
@@ -326,7 +328,7 @@ namespace Psychometric_Test_Designer.Services
                     RawScore = scale.Value,
                     NormalizedScore = normalized[scale.Key],
                     SourceTestId = dto.TestId,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = createdAt
                 });
 
                 result.Add(new ProcessedScaleResultDto

@@ -13,6 +13,9 @@ namespace Psychometric_Test_Designer.Data
                 ALTER TABLE users
                 ADD COLUMN IF NOT EXISTS role VARCHAR(30) NOT NULL DEFAULT 'Student';
 
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS full_name VARCHAR(200) NOT NULL DEFAULT '';
+
                 ALTER TABLE user_metric_snapshots
                 ADD COLUMN IF NOT EXISTS source_test_id INT REFERENCES tests(test_id),
                 ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
@@ -61,6 +64,11 @@ namespace Psychometric_Test_Designer.Data
                     opens_at TIMESTAMP NOT NULL,
                     closes_at TIMESTAMP NOT NULL,
                     created_at TIMESTAMP DEFAULT NOW()
+                );
+
+                CREATE TABLE IF NOT EXISTS app_seed_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
                 );
                 """);
         }

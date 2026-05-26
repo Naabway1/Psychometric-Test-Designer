@@ -43,7 +43,7 @@ namespace Psychometric_Test_Designer.Controllers
             });
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "PsychologistOnly")]
         [HttpPost("submit")]
         public async Task<IActionResult> Submit([FromBody] SubmitTestDto dto)
         {

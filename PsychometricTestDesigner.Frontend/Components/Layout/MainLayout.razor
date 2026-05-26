@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject AuthState Auth
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 @if (!Auth.IsAuthenticated)
 {
@@ -23,8 +24,20 @@ else
                     <span>Система анализа и аналитики климата в учебном коллективе</span>
                 </div>
                 <div class="session">
-                    <span class="badge">@Auth.RoleLabel</span>
-                    <button class="btn-secondary" type="button" @onclick="Logout">Выйти</button>
+                    <div class="session-profile" title="@Auth.ProfileTitle">
+                        <strong>@Auth.ProfileTitle</strong>
+                        <small>@Auth.ProfileSubtitle</small>
+                    </div>
+                    <button class="icon-button header-icon theme-toggle" type="button" title="@ThemeButtonTitle" aria-label="@ThemeButtonTitle" @onclick="ToggleTheme">
+                        <span aria-hidden="true">@ThemeIcon</span>
+                    </button>
+                    <button class="icon-button header-icon" type="button" title="Выйти" aria-label="Выйти" @onclick="Logout">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M10 17l5-5-5-5" />
+                            <path d="M15 12H3" />
+                            <path d="M14 3h4a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-4" />
+                        </svg>
+                    </button>
                 </div>
             </header>
 
@@ -36,9 +49,27 @@ else
 }
 
 @code {
+    private string theme = "dark";
+    private string ThemeIcon => theme == "light" ? "☀" : "☾";
+    private string ThemeButtonTitle => theme == "light" ? "Включить темную тему" : "Включить светлую тему";
+
     protected override void OnInitialized()
     {
         Auth.Changed += StateHasChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            theme = await JS.InvokeAsync<string>("ptdTheme.get");
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        theme = await JS.InvokeAsync<string>("ptdTheme.toggle");
     }
 
     private void Logout()

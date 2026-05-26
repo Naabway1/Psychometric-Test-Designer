@@ -3,21 +3,20 @@
 @inject AuthState Auth
 @inject IJSRuntime JS
 
-<PageTitle>NLP-связь</PageTitle>
+<PageTitle>Обратная связь</PageTitle>
 
 <div class="page-title">
     <div>
-        <h1>NLP-анализ обратной связи</h1>
-        <p>Темы, тональность и последние сообщения показывают, что беспокоит студентов на уровне группы.</p>
+        <h1>Обратная связь студентов</h1>
+        <p>Текстовые сообщения, темы и эмоциональная тональность с привязкой к студенту и группе.</p>
     </div>
-    <span class="badge">@Auth.RoleLabel</span>
 </div>
 
 @if (!Auth.IsAuthenticated)
 {
     <section class="panel">
         <h2>Нужен вход</h2>
-        <p>Войдите как студент или сотрудник.</p>
+        <p>Войдите как студент или психолог.</p>
     </section>
 }
 else if (Auth.IsStudent)
@@ -37,11 +36,75 @@ else if (Auth.IsStudent)
         </form>
     </section>
 }
-else
+else if (!Auth.IsPsychologist)
 {
     <section class="panel">
+        <h2>Доступ ограничен</h2>
+        <p>Просмотр обратной связи с ФИО студентов доступен только психологу.</p>
+    </section>
+}
+else
+{
+    @if (allTrend != null)
+    {
+        <div class="grid cols-3">
+            <section class="panel">
+                <h2>Сообщений</h2>
+                <div class="metric">
+                    <span>Последние записи</span>
+                    <strong>@allTrend.TotalMessages</strong>
+                </div>
+            </section>
+            <section class="panel">
+                <h2>Средняя тональность</h2>
+                <div class="metric">
+                    <span>Все группы</span>
+                    <strong>@Math.Round(allTrend.AverageSentiment, 1)</strong>
+                </div>
+            </section>
+            <section class="panel">
+                <h2>Главные темы</h2>
+                @foreach (var topic in allTrend.Topics.Take(3))
+                {
+                    <div class="metric">
+                        <span>@RuText.Fix(topic.Topic)</span>
+                        <strong>@topic.Count</strong>
+                    </div>
+                }
+            </section>
+        </div>
+
+        <section class="panel" style="margin-top:14px">
+            <h2>Последние сообщения по всем группам</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Студент</th>
+                        <th>Группа</th>
+                        <th>Тональность</th>
+                        <th>Темы</th>
+                        <th>Сообщение</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var message in allTrend.RecentMessages)
+                    {
+                        <tr>
+                            <td>@RuText.Fix(message.StudentFullName)</td>
+                            <td>@RuText.Fix(message.GroupName)</td>
+                            <td>@Math.Round(message.SentimentScore, 1)</td>
+                            <td>@string.Join(", ", message.Topics.Select(RuText.Fix))</td>
+                            <td>@RuText.Fix(message.Text)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
+
+    <section class="panel" style="margin-top:14px">
         <div class="field">
-            <label>Группа</label>
+            <label>Группа для детализации</label>
             <select value="@selectedGroupId" @onchange="ChangeGroup">
                 @foreach (var group in groups)
                 {
@@ -53,46 +116,23 @@ else
 
     @if (trend != null)
     {
-        <div class="grid cols-3" style="margin-top:14px">
+        <div class="grid chart-layout" style="margin-top:14px">
             <section class="panel">
-                <h2>Сообщений</h2>
-                <div class="metric">
-                    <span>@RuText.Fix(trend.GroupName)</span>
-                    <strong>@trend.TotalMessages</strong>
-                </div>
-            </section>
-            <section class="panel">
-                <h2>Тональность</h2>
-                <div class="metric">
-                    <span>Средняя</span>
-                    <strong>@Math.Round(trend.AverageSentiment, 1)</strong>
-                </div>
-            </section>
-            <section class="panel">
-                <h2>Главные темы</h2>
-                @foreach (var topic in trend.Topics.Take(3))
-                {
-                    <div class="metric">
-                        <span>@RuText.Fix(topic.Topic)</span>
-                        <strong>@topic.Count</strong>
-                    </div>
-                }
-            </section>
-        </div>
-
-        <div class="grid cols-2" style="margin-top:14px">
-            <section class="panel">
-                <h2>Темы обратной связи</h2>
+                <h2>Темы выбранной группы</h2>
+                <p class="chart-caption">Диаграмма показывает, какие темы чаще встречаются в последних сообщениях выбранной группы. Она помогает быстро увидеть основные источники напряжения или поддержки в обратной связи студентов.</p>
                 <div class="chart-box">
                     <canvas id="feedbackTopicsChart"></canvas>
                 </div>
             </section>
             <section class="panel">
-                <h2>Последние сообщения</h2>
+                <h2>Последние сообщения группы</h2>
                 @foreach (var message in trend.RecentMessages)
                 {
-                    <div class="panel" style="box-shadow:none;margin-bottom:10px">
-                        <span class="badge">@Math.Round(message.SentimentScore, 1)</span>
+                    <div class="message-card">
+                        <div class="message-meta">
+                            <strong>@RuText.Fix(message.StudentFullName)</strong>
+                            <span>@Math.Round(message.SentimentScore, 1)</span>
+                        </div>
                         <p>@RuText.Fix(message.Text)</p>
                         <small>@string.Join(", ", message.Topics.Select(RuText.Fix))</small>
                     </div>
@@ -110,7 +150,8 @@ else
 }
 
 @code {
-    private List<GroupRiskSummary> groups = new();
+    private List<GroupDto> groups = new();
+    private GroupFeedbackTrend? allTrend;
     private GroupFeedbackTrend? trend;
     private int selectedGroupId;
     private string studentFeedback = string.Empty;
@@ -120,10 +161,11 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsStaff)
+        if (Auth.IsPsychologist)
         {
-            groups = await Api.GetRiskSummariesAsync();
+            groups = await Api.GetGroupsAsync();
             selectedGroupId = groups.FirstOrDefault()?.GroupId ?? 0;
+            allTrend = await Api.GetAllFeedbackTrendAsync();
             await LoadTrend();
         }
     }

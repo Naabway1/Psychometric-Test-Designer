@@ -3,21 +3,27 @@
 @inject AuthState Auth
 @inject IJSRuntime JS
 
-<PageTitle>Студент</PageTitle>
+<PageTitle>Личный кабинет</PageTitle>
 
 <div class="page-title">
     <div>
-        <h1>Личная аналитика студента</h1>
-        <p>Опросы, персональные метрики и обратная связь для анализа групповой динамики.</p>
+        <h1>Личный кабинет студента</h1>
+        <p>Доступные тестирования, текущие метрики и персональная обратная связь.</p>
     </div>
-    <span class="badge">@Auth.RoleLabel</span>
 </div>
 
 @if (!Auth.IsAuthenticated)
 {
     <section class="panel">
         <h2>Нужен вход</h2>
-        <p>Сначала войдите в систему на главном пульте.</p>
+        <p>Сначала войдите в систему.</p>
+    </section>
+}
+else if (!Auth.IsStudent)
+{
+    <section class="panel">
+        <h2>Раздел студента</h2>
+        <p>Этот экран предназначен для прохождения тестов студентами.</p>
     </section>
 }
 else
@@ -25,9 +31,10 @@ else
     <div class="grid cols-3">
         <section class="panel">
             <h2>Текущие метрики</h2>
+            <p class="muted">Здесь отображается сглаженное значение EMA после всех прохождений.</p>
             @if (metrics.Count == 0)
             {
-                <p>Метрики появятся после прохождения опроса.</p>
+                <p>Метрики появятся после прохождения теста.</p>
             }
             @foreach (var metric in metrics)
             {
@@ -39,17 +46,19 @@ else
         </section>
 
         <section class="panel">
-            <h2>Шкалы</h2>
+            <h2>Текущие метрики EMA</h2>
+            <p class="chart-caption">Диаграмма показывает сглаженные текущие метрики студента после всех прохождений. Цвет учитывает тип метрики: для рисковых высокие значения опаснее, для позитивных наоборот.</p>
             <div class="chart-box compact">
                 <canvas id="studentScalesChart"></canvas>
             </div>
         </section>
 
         <section class="panel">
-            <h2>Последний результат</h2>
+            <h2>Последний результат теста</h2>
+            <p class="muted">Показывает именно последнее прохождение без EMA-сглаживания.</p>
             @if (lastResult == null)
             {
-                <p>После отправки опроса здесь появятся рассчитанные показатели.</p>
+                <p>После отправки теста здесь появятся рассчитанные показатели.</p>
             }
             else
             {
@@ -57,7 +66,7 @@ else
                 {
                     <div class="metric">
                         <span>@RuText.Fix(metric.MetricName)</span>
-                        <strong>@Math.Round(metric.EmaValue, 1)</strong>
+                        <strong>@Math.Round(metric.CurrentValue, 1)</strong>
                     </div>
                 }
             }
@@ -66,48 +75,20 @@ else
 
     <div class="grid cols-2" style="margin-top:14px">
         <section class="panel">
-            <h2>Пройти опрос</h2>
-            <div class="field">
-                <label>Опрос</label>
-                <select value="@selectedTestId" @onchange="SelectTest">
-                    <option value="0">Выберите доступный опрос</option>
-                    @foreach (var test in tests)
-                    {
-                        <option value="@test.TestId">@RuText.Fix(test.TestTitle) — до @ToLocal(test.ClosesAt).ToString("dd.MM HH:mm")</option>
-                    }
-                </select>
-            </div>
-
+            <h2>Доступные тестирования</h2>
             @if (tests.Count == 0)
             {
-                <p style="margin-top:12px">Сейчас для вашей группы нет открытых тестов.</p>
+                <p>Сейчас для вашей группы нет открытых тестов.</p>
             }
-
-            @if (fullTest != null)
+            @foreach (var test in tests)
             {
-                <form @onsubmit="SubmitTest" @onsubmit:preventDefault>
-                    <div class="form-grid" style="margin-top:12px">
-                        @foreach (var question in fullTest.Questions)
-                        {
-                            <div class="panel" style="box-shadow:none">
-                                <h3>@RuText.Fix(question.Text)</h3>
-                                @foreach (var answer in question.AnswerOptions)
-                                {
-                                    <label style="display:flex;gap:10px;align-items:center;margin:6px 0">
-                                        <input type="radio"
-                                               name="@($"q{question.QuestionId}")"
-                                               checked="@IsSelected(question.QuestionId, answer.AnswerId)"
-                                               @onchange="@(() => SelectAnswer(question.QuestionId, answer.AnswerId))" />
-                                        <span>@RuText.Fix(answer.Text)</span>
-                                    </label>
-                                }
-                            </div>
-                        }
-                        <div class="button-row">
-                            <button class="btn-primary" type="submit" disabled="@busy">Отправить ответы</button>
-                        </div>
+                <div class="test-card">
+                    <div>
+                        <strong>@RuText.Fix(test.TestTitle)</strong>
+                        <small>Доступен до @ToLocal(test.ClosesAt).ToString("dd.MM.yyyy HH:mm")</small>
                     </div>
-                </form>
+                    <button class="btn-primary" type="button" disabled="@busy" @onclick="() => StartTest(test)">Пройти</button>
+                </div>
             }
         </section>
 
@@ -136,6 +117,46 @@ else
     </div>
 }
 
+@if (showTestModal && fullTest != null)
+{
+    <div class="modal-backdrop">
+        <section class="modal-panel">
+            <div class="modal-head">
+                <div>
+                    <h2>@RuText.Fix(fullTest.Title)</h2>
+                    <p>Ответьте на все вопросы и отправьте тестирование.</p>
+                </div>
+                <button class="icon-button" type="button" title="Закрыть" @onclick="CloseModal">×</button>
+            </div>
+
+            <form @onsubmit="SubmitTest" @onsubmit:preventDefault>
+                <div class="modal-body">
+                    @foreach (var question in fullTest.Questions)
+                    {
+                        <div class="question-block">
+                            <h3>@RuText.Fix(question.Text)</h3>
+                            @foreach (var answer in question.AnswerOptions)
+                            {
+                                <label class="radio-row">
+                                    <input type="radio"
+                                           name="@($"q{question.QuestionId}")"
+                                           checked="@IsSelected(question.QuestionId, answer.AnswerId)"
+                                           @onchange="@(() => SelectAnswer(question.QuestionId, answer.AnswerId))" />
+                                    <span>@RuText.Fix(answer.Text)</span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-secondary" type="button" @onclick="CloseModal">Отмена</button>
+                    <button class="btn-primary" type="submit" disabled="@busy">Завершить тест</button>
+                </div>
+            </form>
+        </section>
+    </div>
+}
+
 @if (!string.IsNullOrWhiteSpace(status))
 {
     <section class="panel" style="margin-top:14px">
@@ -147,19 +168,18 @@ else
     private readonly Dictionary<int, int> answers = new();
     private List<TestAssignment> tests = new();
     private List<UserMetric> metrics = new();
-    private List<UserScaleResult> scaleResults = new();
     private FullTestResponse? fullTest;
     private ProcessTestResult? lastResult;
     private FeedbackResponse? feedbackResult;
-    private int selectedTestId;
     private string feedbackText = string.Empty;
     private string? status;
     private bool busy;
     private bool chartsPending;
+    private bool showTestModal;
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsAuthenticated)
+        if (Auth.IsStudent)
         {
             await LoadData();
         }
@@ -176,17 +196,28 @@ else
 
     private async Task LoadData()
     {
-        tests = Auth.IsStudent ? await Api.GetAvailableTestsAsync() : new List<TestAssignment>();
+        tests = await Api.GetAvailableTestsAsync();
         metrics = await Api.GetMyMetricsAsync();
-        scaleResults = await Api.GetMyScaleResultsAsync();
         chartsPending = true;
     }
 
-    private async Task SelectTest(ChangeEventArgs args)
+    private async Task StartTest(TestAssignment assignment)
     {
         answers.Clear();
-        selectedTestId = int.TryParse(args.Value?.ToString(), out var id) ? id : 0;
-        fullTest = selectedTestId > 0 ? await Api.GetFullTestAsync(selectedTestId) : null;
+        status = null;
+        fullTest = await Api.GetFullTestAsync(assignment.TestId);
+        showTestModal = fullTest != null;
+        if (fullTest == null)
+        {
+            status = Api.LastError;
+        }
+    }
+
+    private void CloseModal()
+    {
+        showTestModal = false;
+        fullTest = null;
+        answers.Clear();
     }
 
     private void SelectAnswer(int questionId, int answerId) => answers[questionId] = answerId;
@@ -213,7 +244,11 @@ else
             TestId = fullTest.TestId,
             Answers = answers.Select(x => new SubmitAnswer { QuestionId = x.Key, AnswerId = x.Value }).ToList()
         });
-        status = lastResult == null ? Api.LastError : "Опрос обработан, метрики обновлены.";
+        status = lastResult == null ? Api.LastError : "Тест завершен, метрики учтены.";
+        if (lastResult != null)
+        {
+            CloseModal();
+        }
         await LoadData();
         busy = false;
     }
@@ -235,16 +270,32 @@ else
 
     private async Task RenderCharts()
     {
-        var latest = scaleResults
-            .GroupBy(x => x.ScaleName)
-            .Select(g => g.OrderByDescending(x => x.CreatedAt).First())
-            .OrderBy(x => RuText.Fix(x.ScaleName))
+        var currentMetrics = metrics
+            .OrderBy(x => RuText.Fix(x.MetricName))
             .ToList();
 
         await JS.InvokeVoidAsync("ptdCharts.bar", "studentScalesChart",
-            latest.Select(x => RuText.Fix(x.ScaleName)).ToArray(),
-            latest.Select(x => Math.Round(x.NormalizedScore * 100, 1)).ToArray(),
-            "Значение шкалы");
+            currentMetrics.Select(x => RuText.Fix(x.MetricName)).ToArray(),
+            currentMetrics.Select(x => Math.Round(x.Value, 1)).ToArray(),
+            "Текущее значение EMA",
+            currentMetrics.Select(x => MetricLevelColor(x.Value, x.IsPositive)).ToArray());
+    }
+
+    private static string MetricLevelColor(decimal value, bool isPositive)
+    {
+        var level = value < 40m
+            ? "low"
+            : value < 70m
+                ? "medium"
+                : "high";
+
+        return level switch
+        {
+            "low" => isPositive ? "#ef4444" : "#22c55e",
+            "medium" => "#facc15",
+            "high" => isPositive ? "#22c55e" : "#ef4444",
+            _ => "#8b5cf6"
+        };
     }
 
     private static DateTime ToLocal(DateTime value) => value.Kind == DateTimeKind.Local

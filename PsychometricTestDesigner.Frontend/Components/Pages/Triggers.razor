@@ -2,21 +2,20 @@
 @inject ApiClient Api
 @inject AuthState Auth
 
-<PageTitle>Триггеры</PageTitle>
+<PageTitle>Сигналы внимания</PageTitle>
 
 <div class="page-title">
     <div>
-        <h1>Уведомления и триггеры</h1>
+        <h1>Сигналы внимания</h1>
         <p>Система подсвечивает группы, где метрики и интегральный риск требуют внимания.</p>
     </div>
-    <span class="badge">@Auth.RoleLabel</span>
 </div>
 
-@if (!Auth.IsStaff)
+@if (!Auth.IsPsychologist)
 {
     <section class="panel">
-        <h2>Доступ для сотрудников</h2>
-        <p>Триггеры предназначены для куратора, социального педагога и администратора.</p>
+        <h2>Доступ ограничен</h2>
+        <p>Сигналы по психологическим показателям доступны только психологу.</p>
     </section>
 }
 else
@@ -113,7 +112,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsStaff)
+        if (Auth.IsPsychologist)
         {
             apiAlerts = await Api.GetAlertsAsync();
             risks = await Api.GetRiskSummariesAsync();

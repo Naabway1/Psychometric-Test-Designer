@@ -23,6 +23,7 @@ namespace Psychometric_Test_Designer.Data
         public DbSet<Token> Tokens { get; set; }
         public DbSet<TextFeedback> TextFeedback { get; set; }
         public DbSet<TestAssignment> TestAssignments { get; set; }
+        public DbSet<SeedState> SeedStates { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

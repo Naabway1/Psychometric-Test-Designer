@@ -7,7 +7,7 @@ using Psychometric_Test_Designer.Services;
 namespace Psychometric_Test_Designer.Controllers
 {
     [ApiController]
-    [Authorize(Policy = "StaffOnly")]
+    [Authorize(Policy = "AdminOnly")]
     [Route("api/tokens")]
     public class TokenController : ControllerBase
     {

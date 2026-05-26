@@ -12,6 +12,8 @@ namespace Psychometric_Test_Designer.Models
         public int UserId { get; set; }
         [Column("login")]
         public string Login { get; set; }
+        [Column("full_name")]
+        public string FullName { get; set; } = string.Empty;
         [Column("password")]
         public string Password { get; set; }
 

@@ -40,7 +40,15 @@ namespace Psychometric_Test_Designer.Controllers
             }
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "PsychologistOnly")]
+        [HttpGet("trends/all")]
+        public async Task<IActionResult> GetAllTrends()
+        {
+            var result = await _feedbackService.GetAllTrends();
+            return Ok(result);
+        }
+
+        [Authorize(Policy = "PsychologistOnly")]
         [HttpGet("groups/{groupId:int}/trends")]
         public async Task<IActionResult> GetGroupTrends([FromRoute] int groupId)
         {

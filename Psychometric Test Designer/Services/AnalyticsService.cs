@@ -87,7 +87,7 @@ namespace Psychometric_Test_Designer.Services
             if (name.Contains("стресс", StringComparison.OrdinalIgnoreCase))
             {
                 if (value >= 70)
-                    return new() { MetricName = name, Level = "Высокий", Advice = "Рекомендуется обратиться к социальному педагогу. Попробуйте техники дыхания и отдых." };
+                    return new() { MetricName = name, Level = "Высокий", Advice = "Рекомендуется обратиться к психологу. Попробуйте техники дыхания и отдых." };
                 if (value >= 40)
                     return new() { MetricName = name, Level = "Средний", Advice = "Старайтесь чередовать учёбу и отдых. Обсуждайте нагрузку с одногруппниками." };
                 return new() { MetricName = name, Level = "Низкий", Advice = "У вас всё хорошо! Продолжайте поддерживать текущий режим." };

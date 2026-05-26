@@ -23,6 +23,7 @@ namespace Psychometric_Test_Designer.Controllers
             var groups = await _groupService.GetAllGroups();
             var result = groups.Select(g => new GroupDto
             {
+                GroupId = g.GroupId,
                 GroupName = g.GroupName,
                 Specialization = g.Specialization,
                 StudentCount = g.StudentCount
@@ -32,6 +33,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpGet("risk-summary")]
+        [Authorize(Policy = "PsychologistOnly")]
         public async Task<IActionResult> GetAllGroupRiskSummaries()
         {
             var summaries = await _groupService.GetAllGroupRiskSummaries();
@@ -39,6 +41,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpGet("{groupId:int}/metrics")]
+        [Authorize(Policy = "PsychologistOnly")]
         public async Task<IActionResult> GetGroupMetrics([FromRoute] int groupId)
         {
             try
@@ -53,6 +56,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpGet("{groupId:int}/metric-history")]
+        [Authorize(Policy = "PsychologistOnly")]
         public async Task<IActionResult> GetGroupMetricHistory([FromRoute] int groupId)
         {
             try
@@ -67,6 +71,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpGet("{groupId:int}/scale-distribution")]
+        [Authorize(Policy = "PsychologistOnly")]
         public async Task<IActionResult> GetGroupScaleDistribution([FromRoute] int groupId)
         {
             try
@@ -81,6 +86,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpGet("{groupId:int}/risk-summary")]
+        [Authorize(Policy = "PsychologistOnly")]
         public async Task<IActionResult> GetGroupRiskSummary([FromRoute] int groupId)
         {
             try
@@ -100,6 +106,7 @@ namespace Psychometric_Test_Designer.Controllers
             var group = await _groupService.GetGroupByName(groupName);
             return Ok(new GroupDto
             {
+                GroupId = group.GroupId,
                 GroupName = group.GroupName,
                 Specialization = group.Specialization,
                 StudentCount = group.StudentCount
@@ -107,6 +114,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> CreateGroup([FromBody] GroupDto dto)
         {
             var result = await _groupService.CreateGroup(dto);
@@ -119,6 +127,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpDelete("{groupName}")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> DeleteGroupByName([FromRoute] string groupName)
         {
             var result = await _groupService.DeleteGroup(groupName);
@@ -131,6 +140,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpPatch("{groupName}")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> UpdateGroup([FromRoute] string groupName, [FromBody] GroupDto dto)
         {
             var result = await _groupService.UpdateGroup(groupName, dto);

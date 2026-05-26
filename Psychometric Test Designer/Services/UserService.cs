@@ -21,6 +21,7 @@ namespace Psychometric_Test_Designer.Services
             {
                 UserId = u.UserId,
                 Login = u.Login,
+                FullName = u.FullName,
                 Password = u.Password,
                 Role = u.Role,
                 GroupId = u.GroupId,
@@ -75,6 +76,7 @@ namespace Psychometric_Test_Designer.Services
             var user = new User
             {
                 Login = dto.Login,
+                FullName = dto.FullName,
                 Password = dto.Password,
                 Role = UserRoles.Student,
                 GroupId = dto.GroupId
@@ -109,6 +111,10 @@ namespace Psychometric_Test_Designer.Services
             if (user.Login != null)
             {
                 user.Login = dto.Login;
+            }
+            if (user.FullName != null)
+            {
+                user.FullName = dto.FullName;
             }
             if (user.Password != null)
             {
@@ -166,6 +172,103 @@ namespace Psychometric_Test_Designer.Services
                     CreatedAt = usr.CreatedAt
                 })
                 .ToListAsync();
+        }
+
+        public async Task<List<StudentResultSummaryDto>> GetGroupStudentResults(int groupId)
+        {
+            var groupExists = await _db.Groups.AnyAsync(g => g.GroupId == groupId);
+            if (!groupExists)
+            {
+                throw new Exception("Группа не найдена");
+            }
+
+            var students = await _db.Users
+                .AsNoTracking()
+                .Where(u => u.GroupId == groupId && u.Role == UserRoles.Student)
+                .OrderBy(u => u.FullName)
+                .Select(u => new
+                {
+                    u.UserId,
+                    u.Login,
+                    u.FullName,
+                    u.GroupId,
+                    GroupName = u.Group.GroupName
+                })
+                .ToListAsync();
+
+            var userIds = students.Select(s => s.UserId).ToList();
+
+            var metrics = await _db.UserMetrics
+                .AsNoTracking()
+                .Where(um => userIds.Contains(um.UserId))
+                .Select(um => new
+                {
+                    um.UserId,
+                    Metric = new UserMetricDto
+                    {
+                        MetricId = um.MetricId,
+                        MetricName = um.Metric.Name,
+                        IsPositive = um.Metric.IsPositive,
+                        Value = um.Value
+                    }
+                })
+                .ToListAsync();
+
+            var scaleRows = await _db.UserScaleResults
+                .AsNoTracking()
+                .Where(usr => userIds.Contains(usr.UserId))
+                .Select(usr => new
+                {
+                    usr.UserId,
+                    usr.SourceTestId,
+                    Scale = new UserScaleResultDto
+                    {
+                        ScaleId = usr.ScaleId,
+                        ScaleName = usr.Scale.Name,
+                        IsPositive = usr.Scale.IsPositive,
+                        RawScore = usr.RawScore,
+                        NormalizedScore = usr.NormalizedScore,
+                        SourceTestId = usr.SourceTestId,
+                        CreatedAt = usr.CreatedAt
+                    }
+                })
+                .ToListAsync();
+
+            return students.Select(student =>
+            {
+                var studentScales = scaleRows
+                    .Where(row => row.UserId == student.UserId)
+                    .ToList();
+                var latestTestId = studentScales
+                    .OrderByDescending(row => row.Scale.CreatedAt)
+                    .Select(row => (int?)row.SourceTestId)
+                    .FirstOrDefault();
+
+                return new StudentResultSummaryDto
+                {
+                    UserId = student.UserId,
+                    Login = student.Login,
+                    FullName = string.IsNullOrWhiteSpace(student.FullName) ? student.Login : student.FullName,
+                    GroupId = student.GroupId,
+                    GroupName = student.GroupName,
+                    LastActivityAt = studentScales
+                        .OrderByDescending(row => row.Scale.CreatedAt)
+                        .Select(row => (DateTime?)row.Scale.CreatedAt)
+                        .FirstOrDefault(),
+                    CurrentMetrics = metrics
+                        .Where(row => row.UserId == student.UserId)
+                        .Select(row => row.Metric)
+                        .OrderBy(metric => metric.MetricId)
+                        .ToList(),
+                    LatestScales = latestTestId.HasValue
+                        ? studentScales
+                            .Where(row => row.SourceTestId == latestTestId.Value)
+                            .Select(row => row.Scale)
+                            .OrderBy(scale => scale.ScaleId)
+                            .ToList()
+                        : new List<UserScaleResultDto>()
+                };
+            }).ToList();
         }
     }
 }

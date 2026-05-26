@@ -46,6 +46,9 @@ public sealed class ApiClient
     public Task<List<GroupRiskSummary>> GetRiskSummariesAsync() =>
         GetListAsync<GroupRiskSummary>("api/groups/risk-summary");
 
+    public Task<List<GroupDto>> GetGroupsAsync() =>
+        GetListAsync<GroupDto>("api/groups");
+
     public Task<List<GroupMetric>> GetGroupMetricsAsync(int groupId) =>
         GetListAsync<GroupMetric>($"api/groups/{groupId}/metrics");
 
@@ -85,6 +88,12 @@ public sealed class ApiClient
     public Task<GroupFeedbackTrend?> GetFeedbackTrendAsync(int groupId) =>
         GetAsync<GroupFeedbackTrend>($"api/feedback/groups/{groupId}/trends");
 
+    public Task<GroupFeedbackTrend?> GetAllFeedbackTrendAsync() =>
+        GetAsync<GroupFeedbackTrend>("api/feedback/trends/all");
+
+    public Task<List<StudentResultSummary>> GetGroupStudentResultsAsync(int groupId) =>
+        GetListAsync<StudentResultSummary>($"api/users/groups/{groupId}/results");
+
     public Task<AdminAnalytics?> GetAdminAnalyticsAsync() =>
         GetAsync<AdminAnalytics>("api/analytics/admin");
 
@@ -105,6 +114,9 @@ public sealed class ApiClient
 
     public Task<FullTestResponse?> CreateDemoTestAsync(int creatorId) =>
         PostAsync<CreateFullTest, FullTestResponse>("api/tests/full", DemoTestFactory.Create(creatorId));
+
+    public Task<FullTestResponse?> CreateFullTestAsync(CreateFullTest request) =>
+        PostAsync<CreateFullTest, FullTestResponse>("api/tests/full", request);
 
     private async Task<List<T>> GetListAsync<T>(string url)
     {
@@ -168,7 +180,7 @@ public sealed class ApiClient
     {
         if (auth != null)
         {
-            _auth.Set(auth.UserId, auth.GroupId, auth.Role, auth.Token);
+            _auth.Set(auth.UserId, auth.GroupId, auth.GroupName, auth.FullName, auth.Role, auth.Token);
         }
     }
 

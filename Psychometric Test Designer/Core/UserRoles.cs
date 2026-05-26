@@ -4,7 +4,8 @@ namespace Psychometric_Test_Designer.Core
     {
         public const string Student = "Student";
         public const string Admin = "Admin";
+        public const string Psychologist = "Psychologist";
         public const string SocialTeacher = "SocialTeacher";
-        public const string Staff = Admin + "," + SocialTeacher;
+        public const string Staff = Admin + "," + Psychologist + "," + SocialTeacher;
     }
 }

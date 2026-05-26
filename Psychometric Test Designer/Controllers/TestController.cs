@@ -18,7 +18,7 @@ namespace Psychometric_Test_Designer.Controllers
             _testService = testService;
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "TestManagement")]
         [HttpPost]
         public async Task<IActionResult> CreateTest([FromBody] TestDto dto)
         {
@@ -30,7 +30,7 @@ namespace Psychometric_Test_Designer.Controllers
             return Ok(test);
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "TestManagement")]
         [HttpPost("full")]
         public async Task<IActionResult> CreateFullTest([FromBody] CreateFullTestDto dto)
         {
@@ -49,7 +49,7 @@ namespace Psychometric_Test_Designer.Controllers
             }
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "TestManagement")]
         [HttpGet]
         public async Task<IActionResult> GetAllTests()
         {
@@ -57,7 +57,7 @@ namespace Psychometric_Test_Designer.Controllers
             return Ok(tests);
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "TestManagement")]
         [HttpGet("assignments")]
         public async Task<IActionResult> GetAssignments()
         {
@@ -65,7 +65,7 @@ namespace Psychometric_Test_Designer.Controllers
             return Ok(assignments);
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "TestManagement")]
         [HttpPost("assignments")]
         public async Task<IActionResult> CreateAssignment([FromBody] CreateTestAssignmentDto dto)
         {
@@ -153,7 +153,7 @@ namespace Psychometric_Test_Designer.Controllers
             }
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "TestManagement")]
         [HttpDelete("{testId}")]
         public async Task<IActionResult> DeleteTest([FromRoute] int testId)
         {
@@ -167,7 +167,7 @@ namespace Psychometric_Test_Designer.Controllers
 
         private async Task<bool> CanAccessTest(int testId)
         {
-            if (User.IsInRole(UserRoles.Admin) || User.IsInRole(UserRoles.SocialTeacher))
+            if (User.IsInRole(UserRoles.Admin) || User.IsInRole(UserRoles.Psychologist))
             {
                 return true;
             }

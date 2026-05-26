@@ -3,21 +3,20 @@
 @inject AuthState Auth
 @inject IJSRuntime JS
 
-<PageTitle>Карта групп</PageTitle>
+<PageTitle>Аналитика групп</PageTitle>
 
 <div class="page-title">
     <div>
-        <h1>Эмоциональная карта групп</h1>
-        <p>Агрегированная картина состояния учебных групп без раскрытия отдельных студентов.</p>
+        <h1>Аналитика учебных групп</h1>
+        <p>Агрегированная картина состояния учебных групп по результатам тестирования.</p>
     </div>
-    <span class="badge">@Auth.RoleLabel</span>
 </div>
 
-@if (!Auth.IsStaff)
+@if (!Auth.IsPsychologist)
 {
     <section class="panel">
-        <h2>Доступ для сотрудников</h2>
-        <p>Этот модуль доступен администратору и социальному педагогу.</p>
+        <h2>Доступ ограничен</h2>
+        <p>Агрегированные психологические показатели доступны только психологу.</p>
     </section>
 }
 else
@@ -48,9 +47,10 @@ else
 
     @if (selectedGroup != null)
     {
-        <div class="grid cols-2" style="margin-top:14px">
+        <div class="grid chart-stack" style="margin-top:14px">
             <section class="panel">
                 <h2>@RuText.Fix(selectedGroup.GroupName): динамика метрик</h2>
+                <p class="chart-caption">График показывает средние значения метрик выбранной группы по датам тестирования. Он помогает увидеть, какие показатели усиливаются или снижаются после повторных измерений.</p>
                 <div class="chart-box">
                     <canvas id="groupHistoryChart"></canvas>
                 </div>
@@ -58,6 +58,7 @@ else
 
             <section class="panel">
                 <h2>@RuText.Fix(selectedGroup.GroupName): распределение шкал</h2>
+                <p class="chart-caption">Диаграмма показывает, сколько результатов студентов попало в низкий, средний и высокий диапазон по каждой шкале. Цвета учитывают тип шкалы: для рисковых высокие значения тревожнее, для позитивных высокие значения благоприятнее.</p>
                 <div class="chart-box">
                     <canvas id="groupScaleChart"></canvas>
                 </div>
@@ -109,7 +110,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsStaff)
+        if (Auth.IsPsychologist)
         {
             summaries = await Api.GetRiskSummariesAsync();
             selectedGroup = summaries.FirstOrDefault();

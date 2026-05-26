@@ -8,16 +8,15 @@
 <div class="page-title">
     <div>
         <h1>Визуализация шкал оценивания</h1>
-        <p>Низкие, средние и высокие значения по шкалам выбранной группы.</p>
+        <p>Распределение шкал и индивидуальные сводки студентов выбранной группы.</p>
     </div>
-    <span class="badge">@Auth.RoleLabel</span>
 </div>
 
-@if (!Auth.IsStaff)
+@if (!Auth.IsPsychologist)
 {
     <section class="panel">
-        <h2>Доступ для сотрудников</h2>
-        <p>Распределение по группе доступно только сотрудникам.</p>
+        <h2>Доступ ограничен</h2>
+        <p>Результаты тестирования и шкалы доступны только психологу.</p>
     </section>
 }
 else
@@ -34,9 +33,10 @@ else
         </div>
     </section>
 
-    <div class="grid cols-2" style="margin-top:14px">
+    <div class="grid chart-layout" style="margin-top:14px">
         <section class="panel">
             <h2>Распределение</h2>
+            <p class="chart-caption">Диаграмма показывает распределение результатов выбранной группы по шкалам: низкий, средний и высокий диапазон. Для рисковых шкал высокий диапазон означает повод для внимания, для позитивных шкал высокий диапазон является благоприятным признаком.</p>
             <div class="chart-box tall">
                 <canvas id="scaleDistributionChart"></canvas>
             </div>
@@ -81,17 +81,43 @@ else
             </tbody>
         </table>
     </section>
+
+    <section class="panel" style="margin-top:14px">
+        <h2>Индивидуальные результаты студентов</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Студент</th>
+                    <th>Последнее тестирование</th>
+                    <th>Текущие метрики EMA</th>
+                    <th>Последние шкалы</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var student in studentResults)
+                {
+                    <tr>
+                        <td>@RuText.Fix(student.FullName)</td>
+                        <td>@(student.LastActivityAt.HasValue ? ToLocal(student.LastActivityAt.Value).ToString("dd.MM.yyyy HH:mm") : "нет данных")</td>
+                        <td>@FormatMetrics(student.CurrentMetrics)</td>
+                        <td>@FormatScales(student.LatestScales)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
 }
 
 @code {
     private List<GroupRiskSummary> groups = new();
     private List<GroupScaleDistribution> distribution = new();
+    private List<StudentResultSummary> studentResults = new();
     private int selectedGroupId;
     private bool chartsPending;
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsStaff)
+        if (Auth.IsPsychologist)
         {
             groups = await Api.GetRiskSummariesAsync();
             selectedGroupId = groups.FirstOrDefault()?.GroupId ?? 0;
@@ -119,6 +145,9 @@ else
         distribution = selectedGroupId > 0
             ? await Api.GetScaleDistributionAsync(selectedGroupId)
             : new List<GroupScaleDistribution>();
+        studentResults = selectedGroupId > 0
+            ? await Api.GetGroupStudentResultsAsync(selectedGroupId)
+            : new List<StudentResultSummary>();
 
         chartsPending = true;
     }
@@ -136,6 +165,24 @@ else
     }
 
     private static string ScaleType(bool isPositive) => isPositive ? "Позитивная" : "Рисковая";
+
+    private static string FormatMetrics(List<UserMetric> metrics)
+    {
+        return metrics.Count == 0
+            ? "нет данных"
+            : string.Join("; ", metrics.Take(4).Select(metric => $"{RuText.Fix(metric.MetricName)}: {Math.Round(metric.Value, 1)}"));
+    }
+
+    private static string FormatScales(List<UserScaleResult> scales)
+    {
+        return scales.Count == 0
+            ? "нет данных"
+            : string.Join("; ", scales.Take(4).Select(scale => $"{RuText.Fix(scale.ScaleName)}: {Math.Round(scale.NormalizedScore * 100, 1)}"));
+    }
+
+    private static DateTime ToLocal(DateTime value) => value.Kind == DateTimeKind.Local
+        ? value
+        : value.AddHours(5);
 
     private static string LevelColor(string level, bool isPositive) => level switch
     {

@@ -59,6 +59,10 @@ namespace Psychometric_Test_Designer.DTOs
     {
         public int FeedbackId { get; set; }
         public int GroupId { get; set; }
+        public string GroupName { get; set; }
+        public int? UserId { get; set; }
+        public string StudentFullName { get; set; }
+        public string StudentLogin { get; set; }
         public string Text { get; set; }
         public decimal SentimentScore { get; set; }
         public List<string> Topics { get; set; } = new();

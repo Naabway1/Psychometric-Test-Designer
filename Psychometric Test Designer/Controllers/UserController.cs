@@ -19,7 +19,7 @@ namespace Psychometric_Test_Designer.Controllers
             _userService = userService;
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "AdminOnly")]
         [HttpPost]
         public async Task<IActionResult> CreateUser([FromBody] UserDto dto)
         {
@@ -32,7 +32,7 @@ namespace Psychometric_Test_Designer.Controllers
             return Ok(user);
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "AdminOnly")]
         [HttpGet]
         public async Task<IActionResult> GetAllUsers()
         {
@@ -71,7 +71,7 @@ namespace Psychometric_Test_Designer.Controllers
             }
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "AdminOnly")]
         [HttpDelete("{userId}")]
         public async Task<IActionResult> DeleteUser([FromRoute] int userId)
         {
@@ -84,7 +84,7 @@ namespace Psychometric_Test_Designer.Controllers
             return Ok(user);
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "AdminOnly")]
         [HttpGet("group/{groupId}")]
         public async Task<IActionResult> GetUsersByGroupId([FromRoute] int groupId)
         {
@@ -99,7 +99,7 @@ namespace Psychometric_Test_Designer.Controllers
             }
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "AdminOnly")]
         [HttpGet("group/name/{groupName}")]
         public async Task<IActionResult> GetUsersByGroupName([FromRoute] string groupName)
         {
@@ -114,7 +114,7 @@ namespace Psychometric_Test_Designer.Controllers
             }
         }
 
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "AdminOnly")]
         [HttpGet("login/{login}")]
         public async Task<IActionResult> GetUserByLogin([FromRoute] string login)
         {
@@ -161,7 +161,7 @@ namespace Psychometric_Test_Designer.Controllers
         [HttpGet("{userId}/metrics")]
         public async Task<IActionResult> GetMetrics([FromRoute] int userId)
         {
-            if (!CanAccessUser(userId))
+            if (!CanAccessStudentResults(userId))
             {
                 return Forbid();
             }
@@ -192,7 +192,7 @@ namespace Psychometric_Test_Designer.Controllers
         [HttpGet("{userId}/scale-results")]
         public async Task<IActionResult> GetScaleResults([FromRoute] int userId)
         {
-            if (!CanAccessUser(userId))
+            if (!CanAccessStudentResults(userId))
             {
                 return Forbid();
             }
@@ -208,14 +208,38 @@ namespace Psychometric_Test_Designer.Controllers
             }
         }
 
+        [Authorize(Policy = "PsychologistOnly")]
+        [HttpGet("groups/{groupId:int}/results")]
+        public async Task<IActionResult> GetGroupStudentResults([FromRoute] int groupId)
+        {
+            try
+            {
+                var result = await _userService.GetGroupStudentResults(groupId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
         private bool CanAccessUser(int userId)
         {
-            return IsStaff() || GetCurrentUserId() == userId;
+            return User.IsInRole(UserRoles.Admin)
+                || User.IsInRole(UserRoles.Psychologist)
+                || GetCurrentUserId() == userId;
+        }
+
+        private bool CanAccessStudentResults(int userId)
+        {
+            return User.IsInRole(UserRoles.Psychologist) || GetCurrentUserId() == userId;
         }
 
         private bool IsStaff()
         {
-            return User.IsInRole(UserRoles.Admin) || User.IsInRole(UserRoles.SocialTeacher);
+            return User.IsInRole(UserRoles.Admin)
+                || User.IsInRole(UserRoles.Psychologist)
+                || User.IsInRole(UserRoles.SocialTeacher);
         }
 
         private int? GetCurrentUserId()

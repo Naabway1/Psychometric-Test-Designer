@@ -6,7 +6,6 @@ using Psychometric_Test_Designer.Services;
 namespace Psychometric_Test_Designer.Controllers
 {
     [ApiController]
-    [Authorize(Policy = "StaffOnly")]
     [Route("api/analytics")]
     public class AnalyticsController : ControllerBase
     {
@@ -20,6 +19,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpGet("admin")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> GetAdminAnalytics()
         {
             var result = await _analyticsService.GetAdminAnalytics();
@@ -27,6 +27,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpGet("fill-rates")]
+        [Authorize(Policy = "PsychologistOnly")]
         public async Task<IActionResult> GetFillRates()
         {
             var result = await _analyticsService.GetGroupFillRates();
@@ -34,6 +35,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpGet("alerts")]
+        [Authorize(Policy = "PsychologistOnly")]
         public async Task<IActionResult> GetAlerts()
         {
             var result = await _notificationService.GetActiveAlerts();
@@ -41,6 +43,7 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [HttpGet("recommendations/{userId}")]
+        [Authorize(Policy = "PsychologistOnly")]
         public async Task<IActionResult> GetRecommendations([FromRoute] int userId)
         {
             try

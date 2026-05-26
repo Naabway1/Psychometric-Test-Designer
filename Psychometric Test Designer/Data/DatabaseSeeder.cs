@@ -7,6 +7,9 @@ namespace Psychometric_Test_Designer.Data
 {
     public static class DatabaseSeeder
     {
+        private const string SeedVersion = "2026-05-25-mixed-scale-values";
+        private const string SeedVersionKey = "demo_seed_version";
+
         private static readonly string[] TargetGroups =
         [
             "163", "165", "167", "169",
@@ -63,15 +66,24 @@ namespace Psychometric_Test_Designer.Data
             AddPsychometricHistory(db, random, students, groups, tests, testSpecs, scaleMap, metricMap);
             AddTextFeedback(db, random, students, groups);
             await db.SaveChangesAsync();
+            await SaveSeedVersion(db);
         }
 
         private static async Task<bool> ShouldReseed(AppDbContext db)
         {
+            var currentSeedVersion = await db.SeedStates
+                .AsNoTracking()
+                .Where(state => state.Key == SeedVersionKey)
+                .Select(state => state.Value)
+                .FirstOrDefaultAsync();
             var groupNames = await db.Groups.AsNoTracking().Select(group => group.GroupName).ToListAsync();
             var hasWrongGroupSet = groupNames.Count != TargetGroups.Length || !TargetGroups.All(groupNames.Contains);
             var hasOldDemoGroups = groupNames.Any(group => group is "D375" or "G342" or "ADM" or "ПИ23" or "БИ21");
             var testsCount = await db.Tests.CountAsync();
             var studentsCount = await db.Users.CountAsync(user => user.Role == UserRoles.Student);
+            var psychologistsCount = await db.Users.CountAsync(user => user.Role == UserRoles.Psychologist);
+            var studentsWithoutFullName = await db.Users.CountAsync(user =>
+                user.Role == UserRoles.Student && user.FullName == "");
             var snapshotsCount = await db.UserMetricSnapshots.CountAsync();
             var positiveScalesCount = await db.Scales.CountAsync(scale => scale.IsPositive);
             var positiveMetricsCount = await db.Metrics.CountAsync(metric => metric.IsPositive);
@@ -81,14 +93,36 @@ namespace Psychometric_Test_Designer.Data
                 test.Title.Contains("Р‘") ||
                 test.Title.Contains("СЊ"));
 
-            return hasOldDemoGroups
+            return currentSeedVersion != SeedVersion
+                || hasOldDemoGroups
                 || hasWrongGroupSet
                 || hasMojibake
                 || testsCount < 5
                 || studentsCount < 320
+                || psychologistsCount < 1
+                || studentsWithoutFullName > 0
                 || snapshotsCount < 10_000
                 || positiveScalesCount < 8
                 || positiveMetricsCount < 3;
+        }
+
+        private static async Task SaveSeedVersion(AppDbContext db)
+        {
+            var marker = await db.SeedStates.FirstOrDefaultAsync(state => state.Key == SeedVersionKey);
+            if (marker == null)
+            {
+                db.SeedStates.Add(new SeedState
+                {
+                    Key = SeedVersionKey,
+                    Value = SeedVersion
+                });
+            }
+            else
+            {
+                marker.Value = SeedVersion;
+            }
+
+            await db.SaveChangesAsync();
         }
 
         private static async Task ClearDemoData(AppDbContext db)
@@ -143,6 +177,7 @@ namespace Psychometric_Test_Designer.Data
                 new()
                 {
                     Login = "admin",
+                    FullName = "Администратор системы",
                     Password = passwordService.HashPassword("12345"),
                     Role = UserRoles.Admin,
                     GroupId = group.GroupId,
@@ -150,7 +185,17 @@ namespace Psychometric_Test_Designer.Data
                 },
                 new()
                 {
+                    Login = "psychologist",
+                    FullName = "Психолог колледжа",
+                    Password = passwordService.HashPassword("12345"),
+                    Role = UserRoles.Psychologist,
+                    GroupId = group.GroupId,
+                    CreatedAt = SeedNow.AddDays(-90)
+                },
+                new()
+                {
                     Login = "teacher",
+                    FullName = "Социальный педагог",
                     Password = passwordService.HashPassword("12345"),
                     Role = UserRoles.SocialTeacher,
                     GroupId = group.GroupId,
@@ -170,6 +215,7 @@ namespace Psychometric_Test_Designer.Data
                     users.Add(new User
                     {
                         Login = $"s{group.GroupName}{index:00}",
+                        FullName = BuildStudentFullName(group.GroupName, index),
                         Password = passwordService.HashPassword("12345"),
                         Role = UserRoles.Student,
                         GroupId = group.GroupId,
@@ -179,6 +225,35 @@ namespace Psychometric_Test_Designer.Data
             }
 
             return users;
+        }
+
+        private static string BuildStudentFullName(string groupName, int index)
+        {
+            var lastNames = new[]
+            {
+                "Иванов", "Петров", "Смирнов", "Кузнецов", "Соколов",
+                "Попов", "Лебедев", "Козлов", "Новиков", "Морозов",
+                "Волков", "Соловьев", "Васильев", "Зайцев", "Павлов",
+                "Семенов", "Голубев", "Виноградов", "Богданов", "Федоров"
+            };
+            var firstNames = new[]
+            {
+                "Алексей", "Дмитрий", "Илья", "Кирилл", "Максим",
+                "Никита", "Артем", "Егор", "Михаил", "Даниил",
+                "Анна", "Мария", "Дарья", "Софья", "Алина",
+                "Екатерина", "Полина", "Виктория", "Ксения", "Елизавета"
+            };
+            var patronymics = new[]
+            {
+                "Андреевич", "Сергеевич", "Дмитриевич", "Игоревич", "Алексеевич",
+                "Николаевич", "Павлович", "Романович", "Владимирович", "Олегович",
+                "Андреевна", "Сергеевна", "Дмитриевна", "Игоревна", "Алексеевна",
+                "Николаевна", "Павловна", "Романовна", "Владимировна", "Олеговна"
+            };
+
+            var offset = groupName.Sum(ch => ch) % lastNames.Length;
+            var arrayIndex = (offset + index - 1) % lastNames.Length;
+            return $"{lastNames[arrayIndex]} {firstNames[arrayIndex]} {patronymics[arrayIndex]}";
         }
 
         private static List<TestSpec> BuildTests()
@@ -614,40 +689,44 @@ namespace Psychometric_Test_Designer.Data
 
         private static StudentProfile BuildStudentProfile(Random random, string groupName, int userId)
         {
-            var groupRisk = groupName[0] switch
-            {
-                '1' => 0.34m,
-                '2' => 0.44m,
-                '3' => 0.56m,
-                '4' => 0.66m,
-                _ => 0.50m
-            };
+            var personalShift = (decimal)(random.NextDouble() * 0.20 - 0.10);
+            var responseStyle = (HashUnit($"{groupName}:{userId}:style") - 0.5m) * 0.16m;
 
-            groupRisk += groupName[^1] switch
-            {
-                '9' => 0.08m,
-                '7' => 0.03m,
-                '5' => -0.02m,
-                '3' => -0.07m,
-                _ => 0m
-            };
-
-            var personalShift = (decimal)(random.NextDouble() * 0.24 - 0.12);
-            var weeklyTrend = userId % 4 == 0
-                ? -0.055m
-                : userId % 5 == 0
-                    ? 0.035m
-                    : -0.018m;
-
-            return new StudentProfile(Clamp(groupRisk + personalShift, 0.12m, 0.88m), weeklyTrend);
+            return new StudentProfile(groupName, userId, personalShift, responseStyle);
         }
 
         private static decimal CalculateScaleValue(Random random, ScaleSpec scale, StudentProfile profile, int wave)
         {
-            var noise = (decimal)(random.NextDouble() * 0.16 - 0.08);
-            var risk = Clamp(profile.RiskBase + profile.WeeklyTrend * wave + noise, 0.05m, 0.95m);
-            var value = scale.IsRisk ? risk : 1m - risk;
+            var groupScaleBase = 0.14m + HashUnit($"{profile.GroupName}:{scale.Name}:group-scale") * 0.72m;
+            var studentScaleShift = (HashUnit($"{profile.UserId}:{scale.Name}:student-scale") - 0.5m) * 0.58m;
+            var trend = (HashUnit($"{profile.GroupName}:{profile.UserId}:{scale.Name}:trend") - 0.5m) * 0.22m * wave;
+            var waveImpulse = (HashUnit($"{profile.UserId}:{scale.Name}:wave:{wave}") - 0.5m) * 0.18m;
+            var noise = (decimal)(random.NextDouble() * 0.14 - 0.07);
+
+            var value = groupScaleBase
+                + studentScaleShift
+                + profile.PersonalShift
+                + profile.ResponseStyle
+                + trend
+                + waveImpulse
+                + noise;
+
             return Math.Round(Clamp(value, 0.03m, 0.97m), 3);
+        }
+
+        private static decimal HashUnit(string value)
+        {
+            unchecked
+            {
+                var hash = 2166136261u;
+                foreach (var ch in value)
+                {
+                    hash ^= ch;
+                    hash *= 16777619u;
+                }
+
+                return (decimal)(hash % 10_000u) / 9_999m;
+            }
         }
 
         private static void AddTextFeedback(AppDbContext db, Random random, List<User> students, List<Group> groups)
@@ -735,6 +814,6 @@ namespace Psychometric_Test_Designer.Data
                 new(name, scaleName, description, true);
         }
 
-        private sealed record StudentProfile(decimal RiskBase, decimal WeeklyTrend);
+        private sealed record StudentProfile(string GroupName, int UserId, decimal PersonalShift, decimal ResponseStyle);
     }
 }

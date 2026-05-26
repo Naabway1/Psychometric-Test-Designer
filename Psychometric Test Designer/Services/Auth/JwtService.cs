@@ -26,6 +26,7 @@ namespace Psychometric_Test_Designer.Services
                 new(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
                 new(ClaimTypes.NameIdentifier, user.UserId.ToString()),
                 new(ClaimTypes.Name, user.Login),
+                new("fullName", user.FullName ?? string.Empty),
                 new(ClaimTypes.Role, user.Role),
                 new("groupId", user.GroupId.ToString())
             };

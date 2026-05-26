@@ -37,6 +37,11 @@ namespace Psychometric_Test_Designer.Services
                 throw new Exception("Юзер с таким логином уже существует");
             }
 
+            if (string.IsNullOrWhiteSpace(registerDto.FullName))
+            {
+                throw new Exception("Укажите ФИО");
+            }
+
             var existingToken = await _db.Tokens.FirstOrDefaultAsync(t => t.TokenId == registerDto.Token);
 
             if (existingToken == null)
@@ -54,6 +59,7 @@ namespace Psychometric_Test_Designer.Services
             var user = new User
             {
                 Login = registerDto.Login,
+                FullName = registerDto.FullName.Trim(),
                 Password = _passwordService.HashPassword(registerDto.Password),
                 GroupId = existingToken.GroupId,
                 Role = UserRoles.Student
@@ -62,7 +68,7 @@ namespace Psychometric_Test_Designer.Services
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
-            return CreateAuthResponse(user);
+            return await CreateAuthResponse(user);
         }
 
         public async Task<AuthResponseDto?> Login(LoginDto loginDto)
@@ -71,7 +77,7 @@ namespace Psychometric_Test_Designer.Services
             if (user == null) { return null; }
             var valid = _passwordService.VerifyPassword(loginDto.Password, user.Password);
             if (!valid) { return null; }
-            return CreateAuthResponse(user);
+            return await CreateAuthResponse(user);
         }
 
         public async Task<AuthResponseDto> RegisterStaff(RegisterStaffDto dto)
@@ -89,6 +95,11 @@ namespace Psychometric_Test_Designer.Services
                 throw new Exception("Юзер с таким логином уже существует");
             }
 
+            if (string.IsNullOrWhiteSpace(dto.FullName))
+            {
+                throw new Exception("Укажите ФИО сотрудника");
+            }
+
             var groupId = dto.GroupId > 0 ? dto.GroupId : await GetOrCreateStaffGroupId();
             var groupExists = await _db.Groups.AnyAsync(g => g.GroupId == groupId);
             if (!groupExists)
@@ -99,6 +110,7 @@ namespace Psychometric_Test_Designer.Services
             var user = new User
             {
                 Login = dto.Login,
+                FullName = dto.FullName.Trim(),
                 Password = _passwordService.HashPassword(dto.Password),
                 GroupId = groupId,
                 Role = role
@@ -107,7 +119,7 @@ namespace Psychometric_Test_Designer.Services
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
 
-            return CreateAuthResponse(user);
+            return await CreateAuthResponse(user);
         }
 
         private async Task<int> GetOrCreateStaffGroupId()
@@ -131,12 +143,21 @@ namespace Psychometric_Test_Designer.Services
             return group.GroupId;
         }
 
-        private AuthResponseDto CreateAuthResponse(User user)
+        private async Task<AuthResponseDto> CreateAuthResponse(User user)
         {
+            var groupName = user.Group?.GroupName
+                ?? await _db.Groups
+                    .Where(group => group.GroupId == user.GroupId)
+                    .Select(group => group.GroupName)
+                    .FirstOrDefaultAsync()
+                ?? user.GroupId.ToString();
+
             return new AuthResponseDto
             {
                 UserId = user.UserId,
                 GroupId = user.GroupId,
+                GroupName = groupName,
+                FullName = user.FullName ?? string.Empty,
                 Role = user.Role,
                 Token = _jwtService.Generate(user)
             };
@@ -144,6 +165,11 @@ namespace Psychometric_Test_Designer.Services
 
         private static string NormalizeStaffRole(string role)
         {
+            if (string.Equals(role, UserRoles.Psychologist, StringComparison.OrdinalIgnoreCase))
+            {
+                return UserRoles.Psychologist;
+            }
+
             if (string.Equals(role, UserRoles.SocialTeacher, StringComparison.OrdinalIgnoreCase))
             {
                 return UserRoles.SocialTeacher;

@@ -1,10 +1,17 @@
 using PsychometricTestDesigner.Frontend.Components;
 using PsychometricTestDesigner.Frontend.Services;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, ".keys")));
 
 builder.Services.AddScoped<AuthState>();
 builder.Services.AddHttpClient<ApiClient>(client =>

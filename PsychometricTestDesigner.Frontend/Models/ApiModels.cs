@@ -4,6 +4,8 @@ public sealed class AuthResponse
 {
     public int UserId { get; set; }
     public int GroupId { get; set; }
+    public string GroupName { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
     public string Token { get; set; } = string.Empty;
 }
@@ -17,6 +19,7 @@ public sealed class LoginRequest
 public sealed class RegisterRequest
 {
     public string Login { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public string Token { get; set; } = string.Empty;
 }
@@ -24,6 +27,7 @@ public sealed class RegisterRequest
 public sealed class RegisterStaffRequest
 {
     public string Login { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public int GroupId { get; set; }
     public string Role { get; set; } = "Admin";
@@ -246,6 +250,10 @@ public sealed class FeedbackResponse
 {
     public int FeedbackId { get; set; }
     public int GroupId { get; set; }
+    public string GroupName { get; set; } = string.Empty;
+    public int? UserId { get; set; }
+    public string StudentFullName { get; set; } = string.Empty;
+    public string StudentLogin { get; set; } = string.Empty;
     public string Text { get; set; } = string.Empty;
     public decimal SentimentScore { get; set; }
     public List<string> Topics { get; set; } = new();
@@ -266,6 +274,18 @@ public sealed class FeedbackTopic
 {
     public string Topic { get; set; } = string.Empty;
     public int Count { get; set; }
+}
+
+public sealed class StudentResultSummary
+{
+    public int UserId { get; set; }
+    public string Login { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public int GroupId { get; set; }
+    public string GroupName { get; set; } = string.Empty;
+    public DateTime? LastActivityAt { get; set; }
+    public List<UserMetric> CurrentMetrics { get; set; } = new();
+    public List<UserScaleResult> LatestScales { get; set; } = new();
 }
 
 public sealed class AdminAnalytics

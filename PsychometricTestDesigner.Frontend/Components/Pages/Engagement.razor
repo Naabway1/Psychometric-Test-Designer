@@ -3,28 +3,28 @@
 @inject AuthState Auth
 @inject IJSRuntime JS
 
-<PageTitle>Вовлечённость</PageTitle>
+<PageTitle>Вовлеченность</PageTitle>
 
 <div class="page-title">
     <div>
-        <h1>Вовлечённость и социальный климат</h1>
-        <p>Модуль заменяет расписание: оценивает активность, участие в опросах и обратную связь по группам.</p>
+        <h1>Вовлеченность и социальный климат</h1>
+        <p>Активность прохождения тестов и обратная связь по учебным группам.</p>
     </div>
-    <span class="badge">@Auth.RoleLabel</span>
 </div>
 
-@if (!Auth.IsStaff)
+@if (!Auth.IsPsychologist)
 {
     <section class="panel">
-        <h2>Доступ для сотрудников</h2>
-        <p>Этот экран нужен куратору, социальному педагогу и администратору.</p>
+        <h2>Доступ ограничен</h2>
+        <p>Показатели вовлеченности доступны только психологу.</p>
     </section>
 }
 else
 {
-    <div class="grid cols-2">
+    <div class="grid chart-layout">
         <section class="panel">
             <h2>Заполнение опросов</h2>
+            <p class="chart-caption">Диаграмма показывает долю активных студентов по каждой учебной группе. Чем ниже процент заполнения, тем меньше данных для интерпретации групповых метрик и тем осторожнее нужно читать результаты.</p>
             <div class="chart-box">
                 <canvas id="engagementFillChart"></canvas>
             </div>
@@ -79,7 +79,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsStaff)
+        if (Auth.IsPsychologist)
         {
             fillRates = await Api.GetFillRatesAsync();
             risks = await Api.GetRiskSummariesAsync();

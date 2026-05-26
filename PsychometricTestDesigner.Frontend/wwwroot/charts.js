@@ -14,27 +14,65 @@
         chartStore.delete(id);
     }
 
+    function themeColor(name, fallback) {
+        const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return value || fallback;
+    }
+
     function options(stacked) {
+        const text = themeColor("--text-primary", "#f5f7fa");
+        const muted = themeColor("--text-secondary", "#a9b1c3");
+        const axis = themeColor("--chart-axis", muted);
+        const grid = themeColor("--chart-grid", themeColor("--border", "rgba(255,255,255,.08)"));
         return {
             responsive: true,
             maintainAspectRatio: false,
+            layout: { padding: 14 },
             plugins: {
-                legend: { labels: { color: "#f5f7fa" } }
+                legend: {
+                    labels: {
+                        color: text,
+                        font: { size: 14 },
+                        boxWidth: 18,
+                        boxHeight: 10
+                    }
+                },
+                tooltip: {
+                    titleFont: { size: 14 },
+                    bodyFont: { size: 13 }
+                }
             },
             scales: {
                 x: {
                     stacked,
-                    ticks: { color: "#a9b1c3" },
-                    grid: { color: "rgba(255,255,255,.06)" }
+                    ticks: {
+                        color: axis,
+                        font: { size: 13 },
+                        autoSkip: false,
+                        maxRotation: 52,
+                        minRotation: 25
+                    },
+                    grid: { color: grid }
                 },
                 y: {
                     stacked,
                     beginAtZero: true,
-                    ticks: { color: "#a9b1c3" },
-                    grid: { color: "rgba(255,255,255,.06)" }
+                    ticks: {
+                        color: axis,
+                        font: { size: 13 }
+                    },
+                    grid: { color: grid }
                 }
             }
         };
+    }
+
+    function refreshTheme() {
+        chartStore.forEach((chart) => {
+            const stacked = Boolean(chart.options?.scales?.x?.stacked);
+            chart.options = options(stacked);
+            chart.update("none");
+        });
     }
 
     function fallbackBar(id, labels, values, label) {
@@ -43,8 +81,10 @@
         const canvas = context.canvas;
         const width = canvas.width = canvas.clientWidth || 640;
         const height = canvas.height = canvas.clientHeight || 280;
+        const text = themeColor("--text-primary", "#f5f7fa");
+        const muted = themeColor("--text-secondary", "#a9b1c3");
         context.clearRect(0, 0, width, height);
-        context.fillStyle = "#a9b1c3";
+        context.fillStyle = muted;
         context.font = "13px Segoe UI, sans-serif";
         context.fillText(label || "Значение", 16, 22);
         const max = Math.max(1, ...values.map(Number));
@@ -55,9 +95,9 @@
             const y = height - 34 - barHeight;
             context.fillStyle = palette[index % palette.length];
             context.fillRect(x, y, barWidth, barHeight);
-            context.fillStyle = "#f5f7fa";
+            context.fillStyle = text;
             context.fillText(String(Math.round(Number(value) * 10) / 10), x, y - 6);
-            context.fillStyle = "#a9b1c3";
+            context.fillStyle = muted;
             context.fillText(String(labels[index] || "").slice(0, 12), x, height - 12);
         });
     }
@@ -138,6 +178,12 @@
                 },
                 options: options(false)
             }));
-        }
+        },
+
+        refreshTheme
     };
+
+    window.addEventListener("ptd-theme-changed", () => {
+        window.requestAnimationFrame(refreshTheme);
+    });
 })();

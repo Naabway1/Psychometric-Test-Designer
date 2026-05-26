@@ -7,16 +7,15 @@
 <div class="page-title">
     <div>
         <h1>Прогнозирование групп риска</h1>
-        <p>Приоритеты для куратора строятся по групповым метрикам, а не по раскрытию конкретных студентов.</p>
+        <p>Приоритеты для психолога строятся по групповым метрикам и помогают выбрать группы для дополнительного внимания.</p>
     </div>
-    <span class="badge">@Auth.RoleLabel</span>
 </div>
 
-@if (!Auth.IsStaff)
+@if (!Auth.IsPsychologist)
 {
     <section class="panel">
-        <h2>Доступ для сотрудников</h2>
-        <p>Риски видят только роли администратора и социального педагога.</p>
+        <h2>Доступ ограничен</h2>
+        <p>Риски учебных групп доступны только психологу.</p>
     </section>
 }
 else
@@ -70,7 +69,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsStaff)
+        if (Auth.IsPsychologist)
         {
             summaries = await Api.GetRiskSummariesAsync();
         }

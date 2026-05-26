@@ -10,38 +10,41 @@
 </div>
 
 <nav class="nav-list">
-    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Пульт</NavLink>
+    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Панель управления</NavLink>
 
     @if (Auth.IsStudent)
     {
-        <NavLink class="nav-link" href="student">Студент</NavLink>
+        <NavLink class="nav-link" href="student">Личный кабинет</NavLink>
         <NavLink class="nav-link" href="feedback">Обратная связь</NavLink>
     }
 
-    @if (Auth.IsStaff)
+    @if (Auth.IsPsychologist)
     {
-        <NavLink class="nav-link" href="groups">Карта групп</NavLink>
+        <NavLink class="nav-link" href="groups">Аналитика групп</NavLink>
         <NavLink class="nav-link" href="risks">Группы риска</NavLink>
-        <NavLink class="nav-link" href="engagement">Вовлечённость</NavLink>
-        <NavLink class="nav-link" href="scales">Шкалы</NavLink>
-        <NavLink class="nav-link" href="feedback">NLP-связь</NavLink>
-        <NavLink class="nav-link" href="triggers">Триггеры</NavLink>
+        <NavLink class="nav-link" href="engagement">Вовлеченность</NavLink>
+        <NavLink class="nav-link" href="scales">Шкалы и результаты</NavLink>
+        <NavLink class="nav-link" href="feedback">Обратная связь</NavLink>
+        <NavLink class="nav-link" href="triggers">Сигналы внимания</NavLink>
     }
 
-    @if (Auth.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+    @if (Auth.CanManageTests)
     {
-        <NavLink class="nav-link" href="admin">Админка</NavLink>
+        <NavLink class="nav-link" href="tests">Конструктор тестов</NavLink>
+    }
+
+    @if (Auth.IsAdmin)
+    {
+        <NavLink class="nav-link" href="admin">Администрирование</NavLink>
     }
 </nav>
 
 <div class="side-session">
-    <span>@Auth.RoleLabel</span>
-    <small>@SessionText</small>
+    <span>@Auth.ProfileTitle</span>
+    <small>@Auth.ProfileSubtitle</small>
 </div>
 
 @code {
-    private string SessionText => $"ID: {Auth.UserId}, группа: {Auth.GroupId}";
-
     protected override void OnInitialized()
     {
         Auth.Changed += StateHasChanged;

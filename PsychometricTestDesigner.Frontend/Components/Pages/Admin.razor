@@ -2,21 +2,20 @@
 @inject ApiClient Api
 @inject AuthState Auth
 
-<PageTitle>Админка</PageTitle>
+<PageTitle>Администрирование</PageTitle>
 
 <div class="page-title">
     <div>
-        <h1>Административная панель</h1>
-        <p>Группы, токены регистрации и быстрый демо-опрос для демонстрации системы.</p>
+        <h1>Администрирование</h1>
+        <p>Базовое управление группами и кодами регистрации без доступа к психологическим результатам.</p>
     </div>
-    <span class="badge">@Auth.RoleLabel</span>
 </div>
 
-@if (!Auth.IsStaff)
+@if (!Auth.IsAdmin)
 {
     <section class="panel">
-        <h2>Доступ для сотрудников</h2>
-        <p>Административные действия доступны только сотрудникам.</p>
+        <h2>Доступ ограничен</h2>
+        <p>Раздел предназначен только для администратора системы.</p>
     </section>
 }
 else
@@ -28,18 +27,18 @@ else
             <div class="metric"><span>Студенты</span><strong>@(analytics?.TotalStudents ?? 0)</strong></div>
         </section>
         <section class="panel">
-            <h2>Опросы</h2>
-            <div class="metric"><span>Тестов</span><strong>@(analytics?.TotalTests ?? 0)</strong></div>
-            <div class="metric"><span>Прохождений</span><strong>@(analytics?.TotalTestsTaken ?? 0)</strong></div>
+            <h2>Учебные группы</h2>
+            <div class="metric"><span>Групп</span><strong>@groups.Count</strong></div>
+            <div class="metric"><span>Кодов регистрации</span><strong>@tokens.Count</strong></div>
         </section>
         <section class="panel">
-            <h2>Активность</h2>
-            <div class="metric"><span>Заполнение</span><strong>@Math.Round(analytics?.FillRate ?? 0, 1)%</strong></div>
-            <div class="metric"><span>Сообщений</span><strong>@(analytics?.TotalFeedback ?? 0)</strong></div>
+            <h2>Система тестирования</h2>
+            <div class="metric"><span>Тестов</span><strong>@(analytics?.TotalTests ?? 0)</strong></div>
+            <div class="metric"><span>Вариантов ответов</span><strong>@(analytics?.TotalAnswers ?? 0)</strong></div>
         </section>
     </div>
 
-    <div class="grid cols-3" style="margin-top:14px">
+    <div class="grid cols-2" style="margin-top:14px">
         <section class="panel">
             <h2>Создать группу</h2>
             <form @onsubmit="CreateGroup" @onsubmit:preventDefault>
@@ -49,22 +48,22 @@ else
                         <input @bind="newGroup.GroupName" />
                     </div>
                     <div class="field">
-                        <label>Специализация</label>
+                        <label>Специальность</label>
                         <input @bind="newGroup.Specialization" />
                     </div>
                     <div class="field">
-                        <label>Количество студентов</label>
+                        <label>Плановое количество студентов</label>
                         <input type="number" min="0" @bind="newGroup.StudentCount" />
                     </div>
                     <div class="button-row">
-                        <button class="btn-primary" type="submit" disabled="@busy">Создать</button>
+                        <button class="btn-primary" type="submit" disabled="@busy">Создать группу</button>
                     </div>
                 </div>
             </form>
         </section>
 
         <section class="panel">
-            <h2>Создать токен</h2>
+            <h2>Создать код регистрации</h2>
             <form @onsubmit="CreateToken" @onsubmit:preventDefault>
                 <div class="form-grid">
                     <div class="field">
@@ -81,106 +80,26 @@ else
                         <input type="number" min="1" @bind="tokenRequest.NumberOfUses" />
                     </div>
                     <div class="button-row">
-                        <button class="btn-primary" type="submit" disabled="@busy">Сгенерировать</button>
+                        <button class="btn-primary" type="submit" disabled="@busy">Сгенерировать код</button>
                     </div>
                 </div>
             </form>
             @if (!string.IsNullOrWhiteSpace(createdToken))
             {
                 <div class="metric">
-                    <span>Токен</span>
-                    <strong style="font-size:14px">@createdToken</strong>
-                </div>
-            }
-        </section>
-
-        <section class="panel">
-            <h2>Демо-опрос</h2>
-            <p>Создаёт полный опрос со шкалами стресса, благополучия, изоляции и дефицита вовлечённости.</p>
-            <div class="button-row">
-                <button class="btn-primary" type="button" disabled="@busy" @onclick="CreateDemoTest">Создать демо-опрос</button>
-            </div>
-            @if (createdTest != null)
-            {
-                <div class="metric">
-                    <span>@RuText.Fix(createdTest.Title)</span>
-                    <strong>#@createdTest.TestId</strong>
+                    <span>Код регистрации</span>
+                    <strong class="small-strong">@createdToken</strong>
                 </div>
             }
         </section>
     </div>
 
     <section class="panel" style="margin-top:14px">
-        <h2>Открыть тест для группы</h2>
-        <form @onsubmit="CreateAssignment" @onsubmit:preventDefault>
-            <div class="grid cols-2">
-                <div class="field">
-                    <label>Тест</label>
-                    <select @bind="assignmentRequest.TestId">
-                        <option value="0">Выберите тест</option>
-                        @foreach (var test in tests)
-                        {
-                            <option value="@test.TestId">@RuText.Fix(test.Title)</option>
-                        }
-                    </select>
-                </div>
-                <div class="field">
-                    <label>Группа</label>
-                    <select @bind="assignmentRequest.GroupId">
-                        @foreach (var group in groups)
-                        {
-                            <option value="@group.GroupId">@RuText.Fix(group.GroupName)</option>
-                        }
-                    </select>
-                </div>
-                <div class="field">
-                    <label>Открыть</label>
-                    <input type="datetime-local" value="@opensAtText" @onchange="ChangeOpensAt" />
-                </div>
-                <div class="field">
-                    <label>Закрыть</label>
-                    <input type="datetime-local" value="@closesAtText" @onchange="ChangeClosesAt" />
-                </div>
-            </div>
-            <div class="button-row">
-                <button class="btn-primary" type="submit" disabled="@busy">Открыть доступ</button>
-            </div>
-        </form>
-    </section>
-
-    <section class="panel" style="margin-top:14px">
-        <h2>Назначенные тесты</h2>
+        <h2>Коды регистрации</h2>
         <table class="table">
             <thead>
                 <tr>
-                    <th>Тест</th>
-                    <th>Группа</th>
-                    <th>Открыт</th>
-                    <th>Закрыт</th>
-                    <th>Статус</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var assignment in assignments)
-                {
-                    <tr>
-                        <td>@RuText.Fix(assignment.TestTitle)</td>
-                        <td>@RuText.Fix(assignment.GroupName)</td>
-                        <td>@ToLocal(assignment.OpensAt).ToString("dd.MM.yyyy HH:mm")</td>
-                        <td>@ToLocal(assignment.ClosesAt).ToString("dd.MM.yyyy HH:mm")</td>
-                        <td><span class="badge">@(assignment.IsActive ? "Открыт" : "Закрыт")</span></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </section>
-
-    <section class="panel" style="margin-top:14px">
-        <h2>Токены регистрации</h2>
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Токен</th>
+                    <th>Код</th>
                     <th>ID группы</th>
                     <th>Осталось использований</th>
                 </tr>
@@ -208,29 +127,17 @@ else
 
 @code {
     private AdminAnalytics? analytics;
-    private List<GroupRiskSummary> groups = new();
+    private List<GroupDto> groups = new();
     private List<TokenResponse> tokens = new();
-    private List<TestSummary> tests = new();
-    private List<TestAssignment> assignments = new();
     private GroupDto newGroup = new() { GroupName = "Новая группа", Specialization = "Специальность", StudentCount = 25 };
     private CreateTokenRequest tokenRequest = new() { NumberOfUses = 30 };
-    private CreateTestAssignment assignmentRequest = new();
-    private string opensAtText = LocalNow.AddHours(-1).ToString("yyyy-MM-ddTHH:mm");
-    private string closesAtText = LocalNow.AddDays(1).ToString("yyyy-MM-ddTHH:mm");
-    private FullTestResponse? createdTest;
     private string? createdToken;
     private string? status;
     private bool busy;
 
-    private static DateTime LocalNow => DateTime.UtcNow.AddHours(5);
-
-    private static DateTime ToLocal(DateTime value) => value.Kind == DateTimeKind.Local
-        ? value
-        : value.AddHours(5);
-
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsStaff)
+        if (Auth.IsAdmin)
         {
             await Load();
         }
@@ -239,20 +146,9 @@ else
     private async Task Load()
     {
         analytics = await Api.GetAdminAnalyticsAsync();
-        groups = await Api.GetRiskSummariesAsync();
+        groups = await Api.GetGroupsAsync();
         tokens = await Api.GetTokensAsync();
-        tests = await Api.GetTestsAsync();
-        assignments = await Api.GetTestAssignmentsAsync();
         tokenRequest.GroupId = groups.FirstOrDefault()?.GroupId ?? tokenRequest.GroupId;
-        if (assignmentRequest.GroupId <= 0)
-        {
-            assignmentRequest.GroupId = groups.FirstOrDefault()?.GroupId ?? assignmentRequest.GroupId;
-        }
-
-        if (assignmentRequest.TestId <= 0)
-        {
-            assignmentRequest.TestId = tests.FirstOrDefault()?.TestId ?? assignmentRequest.TestId;
-        }
     }
 
     private async Task CreateGroup()
@@ -269,50 +165,8 @@ else
         busy = true;
         var result = await Api.CreateTokenAsync(tokenRequest);
         createdToken = result?.TokenId;
-        status = result == null ? Api.LastError : "Токен создан.";
+        status = result == null ? Api.LastError : "Код регистрации создан.";
         await Load();
         busy = false;
-    }
-
-    private async Task CreateDemoTest()
-    {
-        busy = true;
-        createdTest = await Api.CreateDemoTestAsync(Auth.UserId);
-        status = createdTest == null ? Api.LastError : "Демо-опрос создан.";
-        if (createdTest != null)
-        {
-            assignmentRequest.TestId = createdTest.TestId;
-        }
-        await Load();
-        busy = false;
-    }
-
-    private async Task CreateAssignment()
-    {
-        if (!DateTime.TryParse(opensAtText, out var opensAt) || !DateTime.TryParse(closesAtText, out var closesAt))
-        {
-            status = "Проверьте даты открытия и закрытия.";
-            return;
-        }
-
-        busy = true;
-        assignmentRequest.OpensAt = opensAt;
-        assignmentRequest.ClosesAt = closesAt;
-        var result = await Api.CreateTestAssignmentAsync(assignmentRequest);
-        status = result == null
-            ? Api.LastError
-            : $"Тест «{RuText.Fix(result.TestTitle)}» открыт для группы {RuText.Fix(result.GroupName)}.";
-        await Load();
-        busy = false;
-    }
-
-    private void ChangeOpensAt(ChangeEventArgs args)
-    {
-        opensAtText = args.Value?.ToString() ?? string.Empty;
-    }
-
-    private void ChangeClosesAt(ChangeEventArgs args)
-    {
-        closesAtText = args.Value?.ToString() ?? string.Empty;
     }
 }

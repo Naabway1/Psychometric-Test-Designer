@@ -61,6 +61,12 @@ public sealed class ApiClient
     public Task<List<TestSummary>> GetTestsAsync() =>
         GetListAsync<TestSummary>("api/tests");
 
+    public Task<List<ScaleResponse>> GetScaleCatalogAsync() =>
+        GetListAsync<ScaleResponse>("api/tests/catalog/scales");
+
+    public Task<List<MetricResponse>> GetMetricCatalogAsync() =>
+        GetListAsync<MetricResponse>("api/tests/catalog/metrics");
+
     public Task<List<TestAssignment>> GetAvailableTestsAsync() =>
         GetListAsync<TestAssignment>("api/tests/available/me");
 
@@ -69,6 +75,10 @@ public sealed class ApiClient
 
     public Task<TestAssignment?> CreateTestAssignmentAsync(CreateTestAssignment request) =>
         PostAsync<CreateTestAssignment, TestAssignment>("api/tests/assignments", request);
+
+    public async Task<List<TestAssignment>> CreateTestAssignmentsAsync(CreateTestAssignments request) =>
+        await PostAsync<CreateTestAssignments, List<TestAssignment>>("api/tests/assignments/bulk", request)
+        ?? new List<TestAssignment>();
 
     public Task<FullTestResponse?> GetFullTestAsync(int testId) =>
         GetAsync<FullTestResponse>($"api/tests/{testId}/full");
@@ -118,6 +128,12 @@ public sealed class ApiClient
     public Task<FullTestResponse?> CreateFullTestAsync(CreateFullTest request) =>
         PostAsync<CreateFullTest, FullTestResponse>("api/tests/full", request);
 
+    public Task<FullTestResponse?> UpdateFullTestAsync(int testId, CreateFullTest request) =>
+        PutAsync<CreateFullTest, FullTestResponse>($"api/tests/{testId}/full", request);
+
+    public Task<TestSummary?> DeleteTestAsync(int testId) =>
+        DeleteAsync<TestSummary>($"api/tests/{testId}");
+
     private async Task<List<T>> GetListAsync<T>(string url)
     {
         var result = await GetAsync<List<T>>(url);
@@ -146,6 +162,26 @@ public sealed class ApiClient
         }
 
         return await SendAsync<TResponse>(request);
+    }
+
+    private async Task<TResponse?> PutAsync<TRequest, TResponse>(string url, TRequest body)
+    {
+        LastError = null;
+        using var request = new HttpRequestMessage(HttpMethod.Put, url)
+        {
+            Content = JsonContent.Create(body, options: _json)
+        };
+
+        ApplyBearer(request);
+        return await SendAsync<TResponse>(request);
+    }
+
+    private async Task<T?> DeleteAsync<T>(string url)
+    {
+        LastError = null;
+        using var request = new HttpRequestMessage(HttpMethod.Delete, url);
+        ApplyBearer(request);
+        return await SendAsync<T>(request);
     }
 
     private async Task<T?> SendAsync<T>(HttpRequestMessage request)

@@ -7,8 +7,9 @@ namespace Psychometric_Test_Designer.Data
 {
     public static class DatabaseSeeder
     {
-        private const string SeedVersion = "2026-05-25-mixed-scale-values";
+        private const string SeedVersion = "2026-05-29-scale-metric-aggregation";
         private const string SeedVersionKey = "demo_seed_version";
+        private const string StaffGroupName = "Администрация колледжа";
 
         private static readonly string[] TargetGroups =
         [
@@ -39,8 +40,10 @@ namespace Psychometric_Test_Designer.Data
             db.Groups.AddRange(groups);
             await db.SaveChangesAsync();
 
-            var staff = CreateStaffUsers(groups[0], passwordService);
-            var students = CreateStudents(groups, passwordService);
+            var staffGroup = groups.First(group => group.GroupName == StaffGroupName);
+            var studentGroups = groups.Where(group => group.GroupName != StaffGroupName).ToList();
+            var staff = CreateStaffUsers(staffGroup, passwordService);
+            var students = CreateStudents(studentGroups, passwordService);
             db.Users.AddRange(staff);
             db.Users.AddRange(students);
             await db.SaveChangesAsync();
@@ -59,12 +62,12 @@ namespace Psychometric_Test_Designer.Data
             AddQuestionsAndLinks(db, testSpecs, tests, scaleMap, metricMap);
             await db.SaveChangesAsync();
 
-            AddOpenAssignments(db, tests, groups);
-            AddRegistrationTokens(db, groups);
+            AddOpenAssignments(db, tests, studentGroups);
+            AddRegistrationTokens(db, studentGroups);
             await db.SaveChangesAsync();
 
-            AddPsychometricHistory(db, random, students, groups, tests, testSpecs, scaleMap, metricMap);
-            AddTextFeedback(db, random, students, groups);
+            AddPsychometricHistory(db, random, students, studentGroups, tests, testSpecs, scaleMap, metricMap);
+            AddTextFeedback(db, random, students, studentGroups);
             await db.SaveChangesAsync();
             await SaveSeedVersion(db);
         }
@@ -77,7 +80,8 @@ namespace Psychometric_Test_Designer.Data
                 .Select(state => state.Value)
                 .FirstOrDefaultAsync();
             var groupNames = await db.Groups.AsNoTracking().Select(group => group.GroupName).ToListAsync();
-            var hasWrongGroupSet = groupNames.Count != TargetGroups.Length || !TargetGroups.All(groupNames.Contains);
+            var expectedGroups = TargetGroups.Append(StaffGroupName).ToList();
+            var hasWrongGroupSet = groupNames.Count != expectedGroups.Count || !expectedGroups.All(groupNames.Contains);
             var hasOldDemoGroups = groupNames.Any(group => group is "D375" or "G342" or "ADM" or "ПИ23" or "БИ21");
             var testsCount = await db.Tests.CountAsync();
             var studentsCount = await db.Users.CountAsync(user => user.Role == UserRoles.Student);
@@ -150,12 +154,24 @@ namespace Psychometric_Test_Designer.Data
 
         private static List<Group> CreateGroups()
         {
-            return TargetGroups.Select(groupName => new Group
+            var groups = new List<Group>
+            {
+                new()
+                {
+                    GroupName = StaffGroupName,
+                    Specialization = "Администрация колледжа",
+                    StudentCount = 0
+                }
+            };
+
+            groups.AddRange(TargetGroups.Select(groupName => new Group
             {
                 GroupName = groupName,
                 Specialization = GetSpecialization(groupName),
                 StudentCount = 20
-            }).ToList();
+            }));
+
+            return groups;
         }
 
         private static string GetSpecialization(string groupName)
@@ -269,10 +285,11 @@ namespace Psychometric_Test_Designer.Data
                         RiskScale("Ригидность", "Трудность переключения и принятия изменений")
                     ],
                     [
-                        MetricSpec.Risk("Тревожность", "Тревожность", "Групповой уровень тревожности"),
-                        MetricSpec.Risk("Фрустрация", "Фрустрация", "Групповой уровень фрустрации"),
-                        MetricSpec.Risk("Агрессивность", "Агрессивность", "Риск напряженных реакций"),
-                        MetricSpec.Risk("Ригидность", "Ригидность", "Сложность адаптации к изменениям")
+                        MetricSpec.RiskComposite("Индекс стресса", "Общий показатель внутреннего напряжения",
+                            ("Тревожность", 0.55), ("Фрустрация", 0.45)),
+                        MetricSpec.Risk("Конфликтность", "Агрессивность", "Риск напряженных реакций"),
+                        MetricSpec.RiskComposite("Риск дезадаптации", "Сложность адаптации к учебным и групповым изменениям",
+                            ("Ригидность", 0.65), ("Фрустрация", 0.35))
                     ]),
                 new(
                     "Стресс и учебная нагрузка",
@@ -283,10 +300,10 @@ namespace Psychometric_Test_Designer.Data
                         PositiveScale("Индекс благополучия", "Общее ощущение устойчивого и нормального состояния")
                     ],
                     [
-                        MetricSpec.Risk("Индекс стресса", "Учебный стресс", "Уровень стрессовой нагрузки"),
-                        MetricSpec.Risk("Перегрузка", "Перегрузка", "Давление учебных задач"),
-                        MetricSpec.Positive("Восстановление", "Восстановление", "Способность восстанавливаться"),
-                        MetricSpec.Positive("Индекс благополучия", "Индекс благополучия", "Позитивное состояние группы")
+                        MetricSpec.RiskComposite("Индекс стресса", "Уровень стрессовой нагрузки",
+                            ("Учебный стресс", 0.6), ("Перегрузка", 0.4)),
+                        MetricSpec.PositiveComposite("Индекс благополучия", "Позитивное состояние группы",
+                            ("Восстановление", 0.55), ("Индекс благополучия", 0.45))
                     ]),
                 new(
                     "Социальный климат и поддержка в группе",
@@ -297,8 +314,8 @@ namespace Psychometric_Test_Designer.Data
                         RiskScale("Социальная изоляция", "Ощущение одиночества внутри учебной группы")
                     ],
                     [
-                        MetricSpec.Positive("Индекс благополучия", "Поддержка группы", "Групповая поддержка"),
-                        MetricSpec.Positive("Эмоциональная стабильность", "Психологическая безопасность", "Безопасность взаимодействия"),
+                        MetricSpec.PositiveComposite("Социальная включенность", "Поддержка и безопасность взаимодействия в группе",
+                            ("Поддержка группы", 0.55), ("Психологическая безопасность", 0.45)),
                         MetricSpec.Risk("Конфликтность", "Конфликтность", "Риск конфликтов"),
                         MetricSpec.Risk("Социальная изоляция", "Социальная изоляция", "Риск выпадения из группы")
                     ]),
@@ -311,8 +328,8 @@ namespace Psychometric_Test_Designer.Data
                         RiskScale("Риск пропусков", "Тенденция избегать занятий и групповых активностей")
                     ],
                     [
-                        MetricSpec.Positive("Эмоциональная стабильность", "Учебная вовлеченность", "Стабильная учебная включенность"),
-                        MetricSpec.Positive("Индекс благополучия", "Ясность учебных задач", "Ясность учебного процесса"),
+                        MetricSpec.PositiveComposite("Вовлеченность", "Учебная включенность и ясность процесса",
+                            ("Учебная вовлеченность", 0.65), ("Ясность учебных задач", 0.35)),
                         MetricSpec.Risk("Дефицит вовлеченности", "Дефицит вовлеченности", "Риск слабого участия"),
                         MetricSpec.Risk("Риск пропусков", "Риск пропусков", "Риск выпадения из учебного ритма")
                     ]),
@@ -325,8 +342,8 @@ namespace Psychometric_Test_Designer.Data
                         RiskScale("Раздражительность", "Склонность быстро раздражаться и реагировать резко")
                     ],
                     [
-                        MetricSpec.Positive("Индекс благополучия", "Настроение", "Позитивный эмоциональный фон"),
-                        MetricSpec.Positive("Эмоциональная стабильность", "Эмоциональная стабильность", "Устойчивость состояния"),
+                        MetricSpec.PositiveComposite("Индекс благополучия", "Позитивный эмоциональный фон и устойчивость состояния",
+                            ("Настроение", 0.5), ("Эмоциональная стабильность", 0.5)),
                         MetricSpec.Risk("Усталость", "Усталость", "Риск утомления"),
                         MetricSpec.Risk("Раздражительность", "Раздражительность", "Эмоциональное напряжение")
                     ])
@@ -415,13 +432,16 @@ namespace Psychometric_Test_Designer.Data
 
                 foreach (var metric in spec.Metrics)
                 {
-                    db.TestScaleMetrics.Add(new TestScaleMetric
+                    foreach (var link in metric.Links)
                     {
-                        TestId = test.TestId,
-                        ScaleId = scaleMap[metric.ScaleName].ScaleId,
-                        MetricId = metricMap[metric.Name].MetricId,
-                        Weight = 1.0
-                    });
+                        db.TestScaleMetrics.Add(new TestScaleMetric
+                        {
+                            TestId = test.TestId,
+                            ScaleId = scaleMap[link.ScaleName].ScaleId,
+                            MetricId = metricMap[metric.Name].MetricId,
+                            Weight = link.Weight
+                        });
+                    }
                 }
             }
         }
@@ -569,10 +589,11 @@ namespace Psychometric_Test_Designer.Data
         {
             return
             [
-                new() { QuestionId = questionId, Text = "Совсем не согласен(на)", Value = 0m },
-                new() { QuestionId = questionId, Text = "Скорее не согласен(на)", Value = 0.33m },
-                new() { QuestionId = questionId, Text = "Скорее согласен(на)", Value = 0.66m },
-                new() { QuestionId = questionId, Text = "Полностью согласен(на)", Value = 1m }
+                new() { QuestionId = questionId, Text = "Совсем не согласен(на)", Value = -2m },
+                new() { QuestionId = questionId, Text = "Скорее не согласен(на)", Value = -1m },
+                new() { QuestionId = questionId, Text = "Затрудняюсь ответить", Value = 0m },
+                new() { QuestionId = questionId, Text = "Скорее согласен(на)", Value = 1m },
+                new() { QuestionId = questionId, Text = "Полностью согласен(на)", Value = 2m }
             ];
         }
 
@@ -586,9 +607,9 @@ namespace Psychometric_Test_Designer.Data
                     {
                         TestId = test.TestId,
                         GroupId = group.GroupId,
-                        OpensAt = SeedNow.AddDays(-28),
+                        OpensAt = SeedNow.AddDays(-2),
                         ClosesAt = SeedNow.AddDays(45),
-                        CreatedAt = SeedNow.AddDays(-29)
+                        CreatedAt = SeedNow.AddDays(-3)
                     });
                 }
             }
@@ -659,7 +680,8 @@ namespace Psychometric_Test_Designer.Data
                         foreach (var metric in spec.Metrics)
                         {
                             var metricId = metricMap[metric.Name].MetricId;
-                            var value = scaleValues[metric.ScaleName] * 100m;
+                            var value = metric.Links.Sum(link =>
+                                scaleValues[link.ScaleName] * (decimal)link.Weight) * 100m;
 
                             db.UserMetricSnapshots.Add(new UserMetricSnapshot
                             {
@@ -757,6 +779,16 @@ namespace Psychometric_Test_Designer.Data
                     "Когда задания делают вместе, становится проще включаться.",
                     "Нужны небольшие общие цели, чтобы группа не распадалась на отдельных людей.",
                     "Общие учебные активности помогают почувствовать себя частью группы."
+                ]),
+                ("тревожность,депрессивное состояние", -75m, [
+                    "Последние дни все кажется бессмысленным, тревога усиливается и сложно просить помощи.",
+                    "Есть ощущение пустоты и безысходности, учебная нагрузка только добивает.",
+                    "Кажется, что сил уже нет, хочется просто исчезнуть и ни с кем не говорить."
+                ]),
+                ("кризисное состояние,депрессивное состояние", -95m, [
+                    "Все тлен, хочется наложить на себя руки, сил держаться почти не осталось.",
+                    "Иногда появляются мысли, что лучше умереть, чем снова идти на пары.",
+                    "Появлялись мысли покончить с собой, страшно оставаться с этим одному."
                 ])
             };
 
@@ -805,14 +837,22 @@ namespace Psychometric_Test_Designer.Data
 
         private sealed record ScaleSpec(string Name, string Description, bool IsRisk);
 
-        private sealed record MetricSpec(string Name, string ScaleName, string Description, bool IsPositive)
+        private sealed record MetricSpec(string Name, List<MetricLinkSpec> Links, string Description, bool IsPositive)
         {
             public static MetricSpec Risk(string name, string scaleName, string description) =>
-                new(name, scaleName, description, false);
+                new(name, [new MetricLinkSpec(scaleName, 1.0)], description, false);
 
             public static MetricSpec Positive(string name, string scaleName, string description) =>
-                new(name, scaleName, description, true);
+                new(name, [new MetricLinkSpec(scaleName, 1.0)], description, true);
+
+            public static MetricSpec RiskComposite(string name, string description, params (string ScaleName, double Weight)[] links) =>
+                new(name, links.Select(link => new MetricLinkSpec(link.ScaleName, link.Weight)).ToList(), description, false);
+
+            public static MetricSpec PositiveComposite(string name, string description, params (string ScaleName, double Weight)[] links) =>
+                new(name, links.Select(link => new MetricLinkSpec(link.ScaleName, link.Weight)).ToList(), description, true);
         }
+
+        private sealed record MetricLinkSpec(string ScaleName, double Weight);
 
         private sealed record StudentProfile(string GroupName, int UserId, decimal PersonalShift, decimal ResponseStyle);
     }

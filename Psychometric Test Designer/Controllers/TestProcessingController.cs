@@ -30,9 +30,13 @@ namespace Psychometric_Test_Designer.Controllers
                 return Unauthorized();
             }
 
-            if (!await _testService.IsTestAvailableForUser(userId.Value, dto.TestId))
+            var isAvailable = dto.AssignmentId > 0
+                ? await _testService.IsAssignmentAvailableForUser(userId.Value, dto.AssignmentId, dto.TestId)
+                : await _testService.IsTestAvailableForUser(userId.Value, dto.TestId);
+
+            if (!isAvailable)
             {
-                return BadRequest(new { message = "Тест сейчас недоступен для вашей группы" });
+                return BadRequest(new { message = "Тест сейчас недоступен для вашей группы или уже пройден" });
             }
 
             return await SubmitInternal(new SubmitTestDto

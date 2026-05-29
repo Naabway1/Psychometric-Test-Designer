@@ -83,6 +83,14 @@ public sealed class CreateTestAssignment
     public DateTime ClosesAt { get; set; }
 }
 
+public sealed class CreateTestAssignments
+{
+    public int TestId { get; set; }
+    public List<int> GroupIds { get; set; } = new();
+    public DateTime OpensAt { get; set; }
+    public DateTime ClosesAt { get; set; }
+}
+
 public sealed class FullTestResponse
 {
     public int TestId { get; set; }
@@ -147,6 +155,7 @@ public sealed class TestScaleMetricResponse
 
 public sealed class SubmitCurrentUserTest
 {
+    public int AssignmentId { get; set; }
     public int TestId { get; set; }
     public List<SubmitAnswer> Answers { get; set; } = new();
 }

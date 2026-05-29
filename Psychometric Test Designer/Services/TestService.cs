@@ -48,6 +48,36 @@ namespace Psychometric_Test_Designer.Services
                 .ToListAsync();
         }
 
+        public async Task<List<ScaleResponseDto>> GetScales()
+        {
+            return await _db.Scales
+                .AsNoTracking()
+                .OrderBy(s => s.Name)
+                .Select(s => new ScaleResponseDto
+                {
+                    ScaleId = s.ScaleId,
+                    Name = s.Name,
+                    Description = s.Description,
+                    IsPositive = s.IsPositive
+                })
+                .ToListAsync();
+        }
+
+        public async Task<List<MetricResponseDto>> GetMetrics()
+        {
+            return await _db.Metrics
+                .AsNoTracking()
+                .OrderBy(m => m.Name)
+                .Select(m => new MetricResponseDto
+                {
+                    MetricId = m.MetricId,
+                    Name = m.Name,
+                    Description = m.Description,
+                    IsPositive = m.IsPositive
+                })
+                .ToListAsync();
+        }
+
         public async Task<TestAssignmentDto> CreateAssignment(CreateTestAssignmentDto dto)
         {
             if (dto.TestId <= 0)
@@ -95,6 +125,67 @@ namespace Psychometric_Test_Designer.Services
             return (await GetAssignments()).First(a => a.AssignmentId == assignment.AssignmentId);
         }
 
+        public async Task<List<TestAssignmentDto>> CreateAssignments(CreateTestAssignmentsDto dto)
+        {
+            if (dto.TestId <= 0)
+            {
+                throw new Exception("Выберите тест");
+            }
+
+            var groupIds = dto.GroupIds
+                .Where(groupId => groupId > 0)
+                .Distinct()
+                .ToList();
+
+            if (groupIds.Count == 0)
+            {
+                throw new Exception("Выберите хотя бы одну группу");
+            }
+
+            var opensAt = ToUtc(dto.OpensAt);
+            var closesAt = ToUtc(dto.ClosesAt);
+
+            if (closesAt <= opensAt)
+            {
+                throw new Exception("Дата закрытия должна быть позже даты открытия");
+            }
+
+            var testExists = await _db.Tests.AnyAsync(t => t.TestId == dto.TestId);
+            if (!testExists)
+            {
+                throw new Exception("Тест не найден");
+            }
+
+            var existingGroupIds = await _db.Groups
+                .Where(g => groupIds.Contains(g.GroupId))
+                .Select(g => g.GroupId)
+                .ToListAsync();
+
+            var missingGroups = groupIds.Except(existingGroupIds).ToList();
+            if (missingGroups.Count > 0)
+            {
+                throw new Exception("Одна или несколько выбранных групп не найдены");
+            }
+
+            var assignments = groupIds.Select(groupId => new TestAssignment
+            {
+                TestId = dto.TestId,
+                GroupId = groupId,
+                OpensAt = opensAt,
+                ClosesAt = closesAt,
+                CreatedAt = DateTime.UtcNow
+            }).ToList();
+
+            _db.TestAssignments.AddRange(assignments);
+            await _db.SaveChangesAsync();
+
+            var assignmentIds = assignments.Select(a => a.AssignmentId).ToList();
+            return (await GetAssignments())
+                .Where(a => assignmentIds.Contains(a.AssignmentId))
+                .OrderBy(a => a.GroupName)
+                .ToList();
+        }
+
         public async Task<List<TestAssignmentDto>> GetAvailableTestsForUser(int userId)
         {
             var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == userId);
@@ -105,7 +196,7 @@ namespace Psychometric_Test_Designer.Services
 
             var now = DateTime.UtcNow;
 
-            return await _db.TestAssignments
+            var assignments = await _db.TestAssignments
                 .AsNoTracking()
                 .Where(a => a.GroupId == user.GroupId && a.OpensAt <= now && a.ClosesAt >= now)
                 .OrderBy(a => a.ClosesAt)
@@ -121,6 +212,17 @@ namespace Psychometric_Test_Designer.Services
                     IsActive = true
                 })
                 .ToListAsync();
+
+            var available = new List<TestAssignmentDto>();
+            foreach (var assignment in assignments)
+            {
+                if (!await HasUserCompletedAssignment(userId, assignment.TestId, assignment.OpensAt, assignment.ClosesAt))
+                {
+                    available.Add(assignment);
+                }
+            }
+
+            return available;
         }
 
         public async Task<bool> IsTestAvailableForUser(int userId, int testId)
@@ -132,11 +234,49 @@ namespace Psychometric_Test_Designer.Services
             }
 
             var now = DateTime.UtcNow;
-            return await _db.TestAssignments.AnyAsync(a =>
-                a.TestId == testId
-                && a.GroupId == user.GroupId
-                && a.OpensAt <= now
-                && a.ClosesAt >= now);
+            var assignments = await _db.TestAssignments
+                .AsNoTracking()
+                .Where(a =>
+                    a.TestId == testId
+                    && a.GroupId == user.GroupId
+                    && a.OpensAt <= now
+                    && a.ClosesAt >= now)
+                .Select(a => new { a.TestId, a.OpensAt, a.ClosesAt })
+                .ToListAsync();
+
+            foreach (var assignment in assignments)
+            {
+                if (!await HasUserCompletedAssignment(userId, assignment.TestId, assignment.OpensAt, assignment.ClosesAt))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public async Task<bool> IsAssignmentAvailableForUser(int userId, int assignmentId, int testId)
+        {
+            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == userId);
+            if (user == null)
+            {
+                return false;
+            }
+
+            var now = DateTime.UtcNow;
+            var assignment = await _db.TestAssignments
+                .AsNoTracking()
+                .Where(a =>
+                    a.AssignmentId == assignmentId
+                    && a.TestId == testId
+                    && a.GroupId == user.GroupId
+                    && a.OpensAt <= now
+                    && a.ClosesAt >= now)
+                .Select(a => new { a.TestId, a.OpensAt, a.ClosesAt })
+                .FirstOrDefaultAsync();
+
+            return assignment != null
+                && !await HasUserCompletedAssignment(userId, assignment.TestId, assignment.OpensAt, assignment.ClosesAt);
         }
 
         public async Task<Test> GetTestById(int testId)
@@ -181,9 +321,22 @@ namespace Psychometric_Test_Designer.Services
                 return null;
             }
 
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
+            var deleted = new Test
+            {
+                TestId = test.TestId,
+                Title = test.Title,
+                CreatedById = test.CreatedById,
+                CreatedAt = test.CreatedAt
+            };
+
+            await RemoveTestStructure(testId, removeAssignments: true, removeResults: true);
             _db.Tests.Remove(test);
-            int result = await _db.SaveChangesAsync();
-            return result > 0 ? test : null;
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return deleted;
         }
 
         public async Task<FullTestResponseDto> CreateFullTest(CreateFullTestDto dto)
@@ -270,7 +423,7 @@ namespace Psychometric_Test_Designer.Services
 
                 if (!metricLinkKeys.Add(key))
                 {
-                    throw new Exception($"Связь шкалы '{scale.Name}' и метрики '{metric.Name}' уже задана");
+                        throw new Exception($"Связь шкалы '{scale.Name}' и показателя '{metric.Name}' уже задана");
                 }
 
                 _db.TestScaleMetrics.Add(new TestScaleMetric
@@ -285,6 +438,43 @@ namespace Psychometric_Test_Designer.Services
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
 
+            return await GetFullTestById(test.TestId);
+        }
+
+        public async Task<FullTestResponseDto> UpdateFullTest(int testId, CreateFullTestDto dto)
+        {
+            ValidateFullTest(dto);
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
+            var test = await _db.Tests.FirstOrDefaultAsync(t => t.TestId == testId);
+            if (test == null)
+            {
+                throw new Exception("Тест не найден");
+            }
+
+            var scaleMap = new Dictionary<string, Scale>(StringComparer.OrdinalIgnoreCase);
+            foreach (var scaleDto in dto.Scales)
+            {
+                var scale = await GetOrCreateScale(scaleDto);
+                scaleMap[NormalizeName(scale.Name)] = scale;
+            }
+
+            var metricMap = new Dictionary<string, Metric>(StringComparer.OrdinalIgnoreCase);
+            foreach (var metricDto in dto.Metrics)
+            {
+                var metric = await GetOrCreateMetric(metricDto);
+                metricMap[NormalizeName(metric.Name)] = metric;
+            }
+
+            await RemoveTestStructure(testId, removeAssignments: false, removeResults: false);
+
+            test.Title = dto.Title.Trim();
+            await _db.SaveChangesAsync();
+
+            await AddFullTestStructure(test.TestId, dto, scaleMap, metricMap);
+
+            await transaction.CommitAsync();
             return await GetFullTestById(test.TestId);
         }
 
@@ -389,6 +579,123 @@ namespace Psychometric_Test_Designer.Services
             };
         }
 
+        private async Task AddFullTestStructure(
+            int testId,
+            CreateFullTestDto dto,
+            Dictionary<string, Scale> scaleMap,
+            Dictionary<string, Metric> metricMap)
+        {
+            foreach (var questionDto in dto.Questions)
+            {
+                var question = new Question
+                {
+                    TestId = testId,
+                    Text = questionDto.Text.Trim()
+                };
+
+                _db.Questions.Add(question);
+                await _db.SaveChangesAsync();
+
+                foreach (var answerDto in questionDto.AnswerOptions)
+                {
+                    _db.AnswerOptions.Add(new AnswerOption
+                    {
+                        QuestionId = question.QuestionId,
+                        Text = answerDto.Text.Trim(),
+                        Value = answerDto.Value
+                    });
+                }
+
+                var questionScaleKeys = new HashSet<int>();
+                foreach (var linkDto in questionDto.ScaleLinks)
+                {
+                    var scale = scaleMap[NormalizeName(linkDto.ScaleName)];
+                    if (!questionScaleKeys.Add(scale.ScaleId))
+                    {
+                        throw new Exception($"Шкала '{scale.Name}' уже привязана к вопросу '{question.Text}'");
+                    }
+
+                    _db.QuestionScales.Add(new QuestionScale
+                    {
+                        QuestionId = question.QuestionId,
+                        ScaleId = scale.ScaleId,
+                        Weight = linkDto.Weight
+                    });
+                }
+            }
+
+            var metricLinkKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var linkDto in dto.MetricLinks)
+            {
+                var scale = scaleMap[NormalizeName(linkDto.ScaleName)];
+                var metric = metricMap[NormalizeName(linkDto.MetricName)];
+                var key = $"{scale.ScaleId}:{metric.MetricId}";
+
+                if (!metricLinkKeys.Add(key))
+                {
+                        throw new Exception($"Связь шкалы '{scale.Name}' и показателя '{metric.Name}' уже задана");
+                }
+
+                _db.TestScaleMetrics.Add(new TestScaleMetric
+                {
+                    TestId = testId,
+                    ScaleId = scale.ScaleId,
+                    MetricId = metric.MetricId,
+                    Weight = linkDto.Weight
+                });
+            }
+
+            await _db.SaveChangesAsync();
+        }
+
+        private async Task RemoveTestStructure(int testId, bool removeAssignments, bool removeResults)
+        {
+            var questionIds = await _db.Questions
+                .Where(q => q.TestId == testId)
+                .Select(q => q.QuestionId)
+                .ToListAsync();
+
+            if (questionIds.Count > 0)
+            {
+                await _db.AnswerOptions
+                    .Where(a => questionIds.Contains(a.QuestionId))
+                    .ExecuteDeleteAsync();
+
+                await _db.QuestionScales
+                    .Where(qs => questionIds.Contains(qs.QuestionId))
+                    .ExecuteDeleteAsync();
+            }
+
+            await _db.TestScaleMetrics
+                .Where(tsm => tsm.TestId == testId)
+                .ExecuteDeleteAsync();
+
+            if (removeAssignments)
+            {
+                await _db.TestAssignments
+                    .Where(a => a.TestId == testId)
+                    .ExecuteDeleteAsync();
+            }
+
+            if (removeResults)
+            {
+                await _db.UserMetricSnapshots
+                    .Where(snapshot => snapshot.SourceTestId == testId)
+                    .ExecuteDeleteAsync();
+
+                await _db.UserScaleResults
+                    .Where(result => result.SourceTestId == testId)
+                    .ExecuteDeleteAsync();
+            }
+
+            if (questionIds.Count > 0)
+            {
+                await _db.Questions
+                    .Where(q => q.TestId == testId)
+                    .ExecuteDeleteAsync();
+            }
+        }
+
         private async Task<Scale> GetOrCreateScale(ScaleDefinitionDto dto)
         {
             var name = NormalizeName(dto.Name);
@@ -466,7 +773,7 @@ namespace Psychometric_Test_Designer.Services
 
             if (dto.Metrics.Count == 0)
             {
-                throw new Exception("Добавьте хотя бы одну метрику");
+                throw new Exception("Добавьте хотя бы один показатель мониторинга");
             }
 
             if (dto.Questions.Count == 0)
@@ -476,7 +783,7 @@ namespace Psychometric_Test_Designer.Services
 
             if (dto.MetricLinks.Count == 0)
             {
-                throw new Exception("Настройте связи шкал с метриками");
+                throw new Exception("Настройте связи шкал с показателями мониторинга");
             }
 
             var scaleNames = dto.Scales
@@ -494,7 +801,7 @@ namespace Psychometric_Test_Designer.Services
 
             if (metricNames.Count != dto.Metrics.Count)
             {
-                throw new Exception("Названия метрик не должны повторяться");
+                throw new Exception("Названия показателей мониторинга не должны повторяться");
             }
 
             foreach (var question in dto.Questions)
@@ -540,8 +847,41 @@ namespace Psychometric_Test_Designer.Services
 
                 if (!metricNames.Contains(NormalizeName(link.MetricName)))
                 {
-                    throw new Exception($"Метрика '{link.MetricName}' не объявлена");
+                    throw new Exception($"Показатель '{link.MetricName}' не объявлен");
                 }
+
+                if (link.Weight <= 0 || link.Weight > 1)
+                {
+                    throw new Exception("Вес связи шкалы с показателем должен быть больше 0 и не больше 1");
+                }
+            }
+
+            var duplicateMetricLink = dto.MetricLinks
+                .GroupBy(link => $"{NormalizeName(link.ScaleName)}::{NormalizeName(link.MetricName)}", StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault(group => group.Count() > 1);
+            if (duplicateMetricLink != null)
+            {
+                throw new Exception("Одна и та же шкала не должна быть дважды связана с одним показателем");
+            }
+
+            var unlinkedScale = dto.Scales.FirstOrDefault(scale =>
+                !dto.MetricLinks.Any(link => string.Equals(
+                    NormalizeName(link.ScaleName),
+                    NormalizeName(scale.Name),
+                    StringComparison.OrdinalIgnoreCase)));
+            if (unlinkedScale != null)
+            {
+                throw new Exception($"Шкала '{unlinkedScale.Name}' должна обновлять хотя бы один показатель мониторинга");
+            }
+
+            var unlinkedMetric = dto.Metrics.FirstOrDefault(metric =>
+                !dto.MetricLinks.Any(link => string.Equals(
+                    NormalizeName(link.MetricName),
+                    NormalizeName(metric.Name),
+                    StringComparison.OrdinalIgnoreCase)));
+            if (unlinkedMetric != null)
+            {
+                throw new Exception($"Показатель '{unlinkedMetric.Name}' должен быть связан хотя бы с одной шкалой");
             }
 
             var metricWeightGroups = dto.MetricLinks.GroupBy(link => NormalizeName(link.MetricName));
@@ -550,7 +890,7 @@ namespace Psychometric_Test_Designer.Services
                 var sum = group.Sum(link => link.Weight);
                 if (Math.Abs(sum - 1) > 0.0001)
                 {
-                    throw new Exception($"Сумма весов шкал для метрики '{group.Key}' должна быть равна 1");
+                    throw new Exception($"Сумма весов шкал для показателя '{group.Key}' должна быть равна 1");
                 }
             }
         }
@@ -579,6 +919,17 @@ namespace Psychometric_Test_Designer.Services
                 || normalized.Contains("wellbeing")
                 || normalized.Contains("mood")
                 || normalized.Contains("stability");
+        }
+
+        private async Task<bool> HasUserCompletedAssignment(int userId, int testId, DateTime opensAt, DateTime closesAt)
+        {
+            return await _db.UserScaleResults
+                .AsNoTracking()
+                .AnyAsync(result =>
+                    result.UserId == userId
+                    && result.SourceTestId == testId
+                    && result.CreatedAt >= opensAt
+                    && result.CreatedAt <= closesAt);
         }
 
         private static DateTime ToUtc(DateTime value)

@@ -16,7 +16,7 @@ namespace Psychometric_Test_Designer.Services
         public async Task<AdminAnalyticsDto> GetAdminAnalytics()
         {
             var totalUsers = await _db.Users.CountAsync();
-            var totalGroups = await _db.Groups.CountAsync();
+            var totalGroups = await _db.Groups.CountAsync(group => (group.StudentCount ?? 0) > 0);
             var totalTests = await _db.Tests.CountAsync();
             var totalSubmissions = await _db.UserScaleResults
                 .Select(usr => usr.SourceTestId)
@@ -46,6 +46,7 @@ namespace Psychometric_Test_Designer.Services
         {
             return await _db.Groups
                 .AsNoTracking()
+                .Where(g => (g.StudentCount ?? 0) > 0)
                 .Select(g => new GroupFillRateDto
                 {
                     GroupId = g.GroupId,

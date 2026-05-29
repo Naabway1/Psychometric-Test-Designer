@@ -220,7 +220,7 @@ namespace Psychometric_Test_Designer.Services
 
             if (links.Count == 0)
             {
-                throw new Exception("Для теста не настроены связи шкал с метриками");
+                throw new Exception("Для теста не настроены связи шкал с показателями мониторинга");
             }
 
             var result = new Dictionary<int, decimal>();

@@ -7,7 +7,7 @@
 <div class="page-title">
     <div>
         <h1>Конструктор тестов</h1>
-        <p>Создание опросов, шкал, метрик и настройка доступности для учебных групп.</p>
+        <p>Создание опросов, шкал теста, показателей мониторинга и настройка доступности для учебных групп.</p>
     </div>
 </div>
 
@@ -21,8 +21,14 @@
 else
 {
     <section class="panel">
-        <h2>Новый тест</h2>
-        <form @onsubmit="CreateTest" @onsubmit:preventDefault>
+        <div class="section-head">
+            <h2>@(IsEditing ? "Редактирование теста" : "Новый тест")</h2>
+            @if (IsEditing)
+            {
+                <button class="btn-secondary" type="button" @onclick="CancelEdit">Отменить редактирование</button>
+            }
+        </div>
+        <form @onsubmit="SaveTest" @onsubmit:preventDefault>
             <div class="form-grid">
                 <div class="field">
                     <label>Название теста</label>
@@ -31,15 +37,31 @@ else
 
                 <div class="builder-section">
                     <div class="section-head">
-                        <h3>Шкалы</h3>
+                        <h3>Шкалы теста</h3>
                         <button class="btn-secondary" type="button" @onclick="AddScale">Добавить шкалу</button>
                     </div>
+                    @if (scaleCatalog.Count > 0)
+                    {
+                        <div class="builder-row reuse-row scale-reuse-row">
+                            <div class="field">
+                                <label>Взять шкалу из каталога</label>
+                                <select @bind="selectedScaleId">
+                                    <option value="0">Выберите шкалу</option>
+                                    @foreach (var scale in scaleCatalog)
+                                    {
+                                        <option value="@scale.ScaleId">@RuText.Fix(scale.Name)</option>
+                                    }
+                                </select>
+                            </div>
+                            <button class="btn-secondary" type="button" @onclick="ReuseScale">Добавить выбранную</button>
+                        </div>
+                    }
                     @foreach (var scale in scales)
                     {
-                        <div class="builder-row">
+                        <div class="builder-row scale-row">
                             <div class="field">
                                 <label>Название</label>
-                                <input @bind="scale.Name" />
+                                <input value="@scale.Name" @onchange="args => RenameScale(scale, args.Value?.ToString() ?? string.Empty)" />
                             </div>
                             <div class="field">
                                 <label>Описание</label>
@@ -59,15 +81,31 @@ else
 
                 <div class="builder-section">
                     <div class="section-head">
-                        <h3>Метрики</h3>
-                        <button class="btn-secondary" type="button" @onclick="AddMetric">Добавить метрику</button>
+                        <h3>Показатели мониторинга</h3>
+                        <button class="btn-secondary" type="button" @onclick="AddMetric">Добавить показатель</button>
                     </div>
+                    @if (metricCatalog.Count > 0)
+                    {
+                        <div class="builder-row reuse-row metric-reuse-row">
+                            <div class="field">
+                                <label>Взять показатель из каталога</label>
+                                <select @bind="selectedMetricId">
+                                    <option value="0">Выберите показатель</option>
+                                    @foreach (var metric in metricCatalog)
+                                    {
+                                        <option value="@metric.MetricId">@RuText.Fix(metric.Name)</option>
+                                    }
+                                </select>
+                            </div>
+                            <button class="btn-secondary" type="button" @onclick="ReuseMetric">Добавить показатель</button>
+                        </div>
+                    }
                     @foreach (var metric in metrics)
                     {
-                        <div class="builder-row">
+                        <div class="builder-row metric-row">
                             <div class="field">
                                 <label>Название</label>
-                                <input @bind="metric.Name" />
+                                <input value="@metric.Name" @onchange="args => RenameMetric(metric, args.Value?.ToString() ?? string.Empty)" />
                             </div>
                             <div class="field">
                                 <label>Описание</label>
@@ -80,16 +118,53 @@ else
                                     <option value="true">Позитивная</option>
                                 </select>
                             </div>
+                            <button class="icon-button danger-button" title="Удалить показатель" type="button" @onclick="() => RemoveMetric(metric)">×</button>
+                        </div>
+                    }
+                </div>
+
+                <div class="builder-section">
+                    <div class="section-head">
+                        <h3>Связи шкал и показателей</h3>
+                        <button class="btn-secondary" type="button" @onclick="AddMetricLink">Добавить связь</button>
+                    </div>
+                    @foreach (var link in metricLinks)
+                    {
+                        <div class="builder-row metric-link-row">
                             <div class="field">
-                                <label>Основная шкала</label>
-                                <select @bind="metric.ScaleName">
+                                <label>Шкала теста</label>
+                                <select @bind="link.ScaleName">
                                     @foreach (var scale in scales)
                                     {
-                                        <option value="@scale.Name">@scale.Name</option>
+                                        <option value="@scale.Name">@RuText.Fix(scale.Name)</option>
                                     }
                                 </select>
                             </div>
-                            <button class="icon-button danger-button" title="Удалить метрику" type="button" @onclick="() => RemoveMetric(metric)">×</button>
+                            <div class="field">
+                                <label>Показатель мониторинга</label>
+                                <select @bind="link.MetricName">
+                                    @foreach (var metric in metrics)
+                                    {
+                                        <option value="@metric.Name">@RuText.Fix(metric.Name)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Вес</label>
+                                <input type="number" min="0" max="1" step="0.05" @bind="link.Weight" />
+                            </div>
+                            <button class="icon-button danger-button" title="Удалить связь" type="button" @onclick="() => RemoveMetricLink(link)">×</button>
+                        </div>
+                    }
+                    @if (metrics.Count > 0)
+                    {
+                        <div class="link-summary-grid">
+                            @foreach (var metric in metrics)
+                            {
+                                <span class="badge @MetricWeightBadgeClass(metric.Name)">
+                                    @RuText.Fix(metric.Name): вес @MetricWeightSum(metric.Name).ToString("0.##")
+                                </span>
+                            }
                         </div>
                     }
                 </div>
@@ -102,7 +177,7 @@ else
                     @foreach (var question in questions)
                     {
                         <div class="question-editor">
-                            <div class="builder-row">
+                            <div class="builder-row question-row">
                                 <div class="field">
                                     <label>Текст вопроса</label>
                                     <input @bind="question.Text" />
@@ -121,9 +196,15 @@ else
                             <div class="answer-grid">
                                 @foreach (var answer in question.Answers)
                                 {
-                                    <div class="field">
-                                        <label>Ответ, значение @answer.Value</label>
-                                        <input @bind="answer.Text" />
+                                    <div class="answer-draft">
+                                        <div class="field answer-text">
+                                            <label>Ответ</label>
+                                            <input @bind="answer.Text" />
+                                        </div>
+                                        <div class="field answer-value">
+                                            <label>Вес</label>
+                                            <input type="number" step="0.1" @bind="answer.Value" />
+                                        </div>
                                     </div>
                                 }
                             </div>
@@ -132,14 +213,44 @@ else
                 </div>
 
                 <div class="button-row">
-                    <button class="btn-primary" type="submit" disabled="@busy">Создать тест</button>
+                    <button class="btn-primary" type="submit" disabled="@busy">@(IsEditing ? "Сохранить изменения" : "Создать тест")</button>
                 </div>
             </div>
         </form>
     </section>
 
     <section class="panel" style="margin-top:14px">
-        <h2>Открыть тест для группы</h2>
+        <h2>Существующие тесты</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Создан</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var test in tests)
+                {
+                    <tr>
+                        <td>@RuText.Fix(test.Title)</td>
+                        <td>@ToLocal(test.CreatedAt).ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>
+                            <div class="table-actions">
+                                <button class="btn-secondary" type="button" disabled="@busy" @onclick="() => LoadTestForEdit(test.TestId)">Редактировать</button>
+                                <button class="btn-secondary danger-button" type="button" disabled="@busy" @onclick="() => DeleteTest(test.TestId)">
+                                    @(pendingDeleteTestId == test.TestId ? "Подтвердить удаление" : "Удалить")
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel" style="margin-top:14px">
+        <h2>Открыть тест для групп</h2>
         <form @onsubmit="CreateAssignment" @onsubmit:preventDefault>
             <div class="grid cols-2">
                 <div class="field">
@@ -153,21 +264,32 @@ else
                     </select>
                 </div>
                 <div class="field">
-                    <label>Группа</label>
-                    <select @bind="assignmentRequest.GroupId">
-                        @foreach (var group in groups)
-                        {
-                            <option value="@group.GroupId">@RuText.Fix(group.GroupName)</option>
-                        }
-                    </select>
-                </div>
-                <div class="field">
                     <label>Открыть</label>
                     <input type="datetime-local" value="@opensAtText" @onchange="ChangeOpensAt" />
                 </div>
                 <div class="field">
                     <label>Закрыть</label>
                     <input type="datetime-local" value="@closesAtText" @onchange="ChangeClosesAt" />
+                </div>
+            </div>
+            <div class="assignment-groups">
+                <div class="section-head">
+                    <h3>Группы: выбрано @selectedAssignmentGroupIds.Count</h3>
+                    <div class="table-actions">
+                        <button class="btn-secondary" type="button" @onclick="SelectAllGroups">Выбрать все</button>
+                        <button class="btn-secondary" type="button" @onclick="ClearAssignmentGroups">Очистить</button>
+                    </div>
+                </div>
+                <div class="group-check-grid">
+                    @foreach (var group in groups)
+                    {
+                        <label class="check-card">
+                            <input type="checkbox"
+                                   checked="@selectedAssignmentGroupIds.Contains(group.GroupId)"
+                                   @onchange="args => ToggleAssignmentGroup(group.GroupId, args)" />
+                            <span>@RuText.Fix(group.GroupName)</span>
+                        </label>
+                    }
                 </div>
             </div>
             <div class="button-row">
@@ -215,15 +337,24 @@ else
     private string testTitle = "Опрос состояния учебной группы";
     private readonly List<ScaleDraft> scales = new();
     private readonly List<MetricDraft> metrics = new();
+    private readonly List<MetricLinkDraft> metricLinks = new();
     private readonly List<QuestionDraft> questions = new();
     private List<GroupDto> groups = new();
     private List<TestSummary> tests = new();
     private List<TestAssignment> assignments = new();
-    private CreateTestAssignment assignmentRequest = new();
+    private List<ScaleResponse> scaleCatalog = new();
+    private List<MetricResponse> metricCatalog = new();
+    private CreateTestAssignments assignmentRequest = new();
+    private readonly HashSet<int> selectedAssignmentGroupIds = new();
+    private int? editingTestId;
+    private int? pendingDeleteTestId;
+    private int selectedScaleId;
+    private int selectedMetricId;
     private string opensAtText = LocalNow.AddHours(-1).ToString("yyyy-MM-ddTHH:mm");
     private string closesAtText = LocalNow.AddDays(7).ToString("yyyy-MM-ddTHH:mm");
     private string? status;
     private bool busy;
+    private bool IsEditing => editingTestId.HasValue;
 
     private static DateTime LocalNow => DateTime.UtcNow.AddHours(5);
 
@@ -241,11 +372,18 @@ else
         groups = await Api.GetGroupsAsync();
         tests = await Api.GetTestsAsync();
         assignments = await Api.GetTestAssignmentsAsync();
-        assignmentRequest.GroupId = groups.FirstOrDefault()?.GroupId ?? assignmentRequest.GroupId;
+        scaleCatalog = await Api.GetScaleCatalogAsync();
+        metricCatalog = await Api.GetMetricCatalogAsync();
         assignmentRequest.TestId = tests.FirstOrDefault()?.TestId ?? assignmentRequest.TestId;
+        var existingGroupIds = groups.Select(group => group.GroupId).ToHashSet();
+        selectedAssignmentGroupIds.RemoveWhere(groupId => !existingGroupIds.Contains(groupId));
+        if (selectedAssignmentGroupIds.Count == 0 && groups.Count > 0)
+        {
+            selectedAssignmentGroupIds.Add(groups[0].GroupId);
+        }
     }
 
-    private async Task CreateTest()
+    private async Task SaveTest()
     {
         if (!ValidateDraft())
         {
@@ -253,44 +391,29 @@ else
         }
 
         busy = true;
-        var request = new CreateFullTest
+        var request = BuildTestRequest();
+        FullTestResponse? result;
+        if (editingTestId.HasValue)
         {
-            Title = testTitle,
-            CreatedById = Auth.UserId,
-            Scales = scales.Select(scale => new ScaleDefinition
+            result = await Api.UpdateFullTestAsync(editingTestId.Value, request);
+            status = result == null ? Api.LastError : $"Тест «{RuText.Fix(result.Title)}» обновлён.";
+            if (result != null)
             {
-                Name = scale.Name,
-                Description = scale.Description,
-                IsPositive = scale.IsPositive
-            }).ToList(),
-            Metrics = metrics.Select(metric => new MetricDefinition
-            {
-                Name = metric.Name,
-                Description = metric.Description,
-                IsPositive = metric.IsPositive
-            }).ToList(),
-            Questions = questions.Select(question => new CreateFullQuestion
-            {
-                Text = question.Text,
-                ScaleLinks = [new QuestionScaleLink { ScaleName = question.ScaleName, Weight = 1 }],
-                AnswerOptions = question.Answers
-                    .Select(answer => new CreateAnswerOption { Text = answer.Text, Value = answer.Value })
-                    .ToList()
-            }).ToList(),
-            MetricLinks = metrics.Select(metric => new TestScaleMetricLink
-            {
-                ScaleName = metric.ScaleName,
-                MetricName = metric.Name,
-                Weight = 1
-            }).ToList()
-        };
-
-        var result = await Api.CreateFullTestAsync(request);
-        status = result == null ? Api.LastError : $"Тест «{RuText.Fix(result.Title)}» создан.";
-        if (result != null)
-        {
-            assignmentRequest.TestId = result.TestId;
+                editingTestId = null;
+                pendingDeleteTestId = null;
+                ResetDraft();
+            }
         }
+        else
+        {
+            result = await Api.CreateFullTestAsync(request);
+            status = result == null ? Api.LastError : $"Тест «{RuText.Fix(result.Title)}» создан.";
+            if (result != null)
+            {
+                assignmentRequest.TestId = result.TestId;
+            }
+        }
+
         await Load();
         busy = false;
     }
@@ -303,15 +426,195 @@ else
             return;
         }
 
+        if (selectedAssignmentGroupIds.Count == 0)
+        {
+            status = "Выберите хотя бы одну группу.";
+            return;
+        }
+
         busy = true;
         assignmentRequest.OpensAt = opensAt;
         assignmentRequest.ClosesAt = closesAt;
-        var result = await Api.CreateTestAssignmentAsync(assignmentRequest);
-        status = result == null
+        assignmentRequest.GroupIds = selectedAssignmentGroupIds.OrderBy(x => x).ToList();
+        var result = await Api.CreateTestAssignmentsAsync(assignmentRequest);
+        status = result.Count == 0
             ? Api.LastError
-            : $"Тест «{RuText.Fix(result.TestTitle)}» открыт для группы {RuText.Fix(result.GroupName)}.";
+            : $"Тест «{RuText.Fix(result[0].TestTitle)}» открыт для групп: {string.Join(", ", result.Select(x => RuText.Fix(x.GroupName)))}.";
         await Load();
         busy = false;
+    }
+
+    private CreateFullTest BuildTestRequest() => new()
+    {
+        Title = testTitle,
+        CreatedById = Auth.UserId,
+        Scales = scales.Select(scale => new ScaleDefinition
+        {
+            Name = scale.Name,
+            Description = scale.Description,
+            IsPositive = scale.IsPositive
+        }).ToList(),
+        Metrics = metrics.Select(metric => new MetricDefinition
+        {
+            Name = metric.Name,
+            Description = metric.Description,
+            IsPositive = metric.IsPositive
+        }).ToList(),
+        Questions = questions.Select(question => new CreateFullQuestion
+        {
+            Text = question.Text,
+            ScaleLinks = [new QuestionScaleLink { ScaleName = question.ScaleName, Weight = 1 }],
+            AnswerOptions = question.Answers
+                .Select(answer => new CreateAnswerOption { Text = answer.Text, Value = answer.Value })
+                .ToList()
+        }).ToList(),
+        MetricLinks = metricLinks.Select(link => new TestScaleMetricLink
+        {
+            ScaleName = link.ScaleName,
+            MetricName = link.MetricName,
+            Weight = (double)link.Weight
+        }).ToList()
+    };
+
+    private async Task LoadTestForEdit(int testId)
+    {
+        busy = true;
+        var test = await Api.GetFullTestAsync(testId);
+        busy = false;
+        if (test == null)
+        {
+            status = Api.LastError;
+            return;
+        }
+
+        editingTestId = test.TestId;
+        pendingDeleteTestId = null;
+        testTitle = RuText.Fix(test.Title);
+
+        scales.Clear();
+        scales.AddRange(test.Scales.Select(scale => new ScaleDraft
+        {
+            Name = RuText.Fix(scale.Name),
+            Description = RuText.Fix(scale.Description),
+            IsPositive = scale.IsPositive
+        }));
+
+        metrics.Clear();
+        metrics.AddRange(test.Metrics.Select(metric => new MetricDraft
+        {
+            Name = RuText.Fix(metric.Name),
+            Description = RuText.Fix(metric.Description),
+            IsPositive = metric.IsPositive
+        }));
+
+        metricLinks.Clear();
+        metricLinks.AddRange(test.MetricLinks.Select(link => new MetricLinkDraft
+        {
+            ScaleName = RuText.Fix(link.ScaleName),
+            MetricName = RuText.Fix(link.MetricName),
+            Weight = (decimal)link.Weight
+        }));
+
+        questions.Clear();
+        questions.AddRange(test.Questions.Select(question =>
+        {
+            var scaleName = RuText.Fix(question.ScaleLinks.FirstOrDefault()?.ScaleName);
+            if (string.IsNullOrWhiteSpace(scaleName))
+            {
+                scaleName = scales.FirstOrDefault()?.Name ?? string.Empty;
+            }
+
+            var draft = new QuestionDraft
+            {
+                Text = RuText.Fix(question.Text),
+                ScaleName = scaleName,
+                Answers = question.AnswerOptions.Select(answer => new AnswerDraft
+                {
+                    Text = RuText.Fix(answer.Text),
+                    Value = answer.Value
+                }).ToList()
+            };
+
+            if (draft.Answers.Count == 0)
+            {
+                draft.Answers = CreateQuestion(string.Empty, scaleName).Answers;
+            }
+
+            return draft;
+        }));
+
+        if (scales.Count == 0)
+        {
+            scales.Add(new() { Name = "Новая шкала" });
+        }
+
+        if (metrics.Count == 0)
+        {
+            metrics.Add(new() { Name = "Новый показатель" });
+        }
+
+        if (questions.Count == 0)
+        {
+            questions.Add(CreateQuestion("Новый вопрос", scales[0].Name));
+        }
+
+        EnsureMetricLinks();
+        status = $"Тест «{RuText.Fix(test.Title)}» открыт для редактирования.";
+    }
+
+    private async Task DeleteTest(int testId)
+    {
+        if (pendingDeleteTestId != testId)
+        {
+            pendingDeleteTestId = testId;
+            status = "Нажмите «Подтвердить удаление», чтобы удалить тест, его вопросы, назначения и связанные результаты.";
+            return;
+        }
+
+        busy = true;
+        var deleted = await Api.DeleteTestAsync(testId);
+        status = deleted == null ? Api.LastError : $"Тест «{RuText.Fix(deleted.Title)}» удалён.";
+        if (editingTestId == testId)
+        {
+            editingTestId = null;
+            ResetDraft();
+        }
+
+        pendingDeleteTestId = null;
+        await Load();
+        busy = false;
+    }
+
+    private void CancelEdit()
+    {
+        editingTestId = null;
+        pendingDeleteTestId = null;
+        ResetDraft();
+        status = null;
+    }
+
+    private void SelectAllGroups()
+    {
+        selectedAssignmentGroupIds.Clear();
+        foreach (var groupId in groups.Select(group => group.GroupId))
+        {
+            selectedAssignmentGroupIds.Add(groupId);
+        }
+    }
+
+    private void ClearAssignmentGroups() => selectedAssignmentGroupIds.Clear();
+
+    private void ToggleAssignmentGroup(int groupId, ChangeEventArgs args)
+    {
+        var isChecked = args.Value is bool value && value;
+        if (isChecked)
+        {
+            selectedAssignmentGroupIds.Add(groupId);
+        }
+        else
+        {
+            selectedAssignmentGroupIds.Remove(groupId);
+        }
     }
 
     private bool ValidateDraft()
@@ -323,16 +626,89 @@ else
         }
 
         if (scales.Any(scale => string.IsNullOrWhiteSpace(scale.Name))
-            || metrics.Any(metric => string.IsNullOrWhiteSpace(metric.Name) || string.IsNullOrWhiteSpace(metric.ScaleName))
+            || metrics.Any(metric => string.IsNullOrWhiteSpace(metric.Name))
             || questions.Any(question => string.IsNullOrWhiteSpace(question.Text) || string.IsNullOrWhiteSpace(question.ScaleName)))
         {
-            status = "Заполните названия шкал, метрик и вопросы.";
+            status = "Заполните названия шкал, показателей мониторинга и вопросы.";
             return false;
         }
 
         if (questions.Any(question => question.Answers.Any(answer => string.IsNullOrWhiteSpace(answer.Text))))
         {
             status = "Заполните все варианты ответов.";
+            return false;
+        }
+
+        if (scales.Select(scale => scale.Name.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != scales.Count
+            || metrics.Select(metric => metric.Name.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != metrics.Count)
+        {
+            status = "Шкалы и показатели мониторинга внутри одного теста не должны повторяться.";
+            return false;
+        }
+
+        if (metricLinks.Count == 0)
+        {
+            status = "Настройте хотя бы одну связь шкалы с показателем мониторинга.";
+            return false;
+        }
+
+        var scaleNames = scales.Select(scale => scale.Name.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var metricNames = metrics.Select(metric => metric.Name.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (metricLinks.Any(link =>
+            string.IsNullOrWhiteSpace(link.ScaleName)
+            || string.IsNullOrWhiteSpace(link.MetricName)
+            || !scaleNames.Contains(link.ScaleName.Trim())
+            || !metricNames.Contains(link.MetricName.Trim())))
+        {
+            status = "Проверьте связи: каждая связь должна ссылаться на существующую шкалу и показатель.";
+            return false;
+        }
+
+        if (metricLinks.Any(link => link.Weight <= 0 || link.Weight > 1))
+        {
+            status = "Вес связи должен быть больше 0 и не больше 1.";
+            return false;
+        }
+
+        var duplicateLink = metricLinks
+            .GroupBy(link => $"{link.ScaleName.Trim()}::{link.MetricName.Trim()}", StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateLink != null)
+        {
+            status = "Одна и та же шкала не должна быть дважды связана с одним показателем.";
+            return false;
+        }
+
+        var unlinkedScale = scales.FirstOrDefault(scale =>
+            !metricLinks.Any(link => string.Equals(link.ScaleName, scale.Name, StringComparison.OrdinalIgnoreCase)));
+        if (unlinkedScale != null)
+        {
+            status = $"Шкала «{RuText.Fix(unlinkedScale.Name)}» должна обновлять хотя бы один показатель мониторинга.";
+            return false;
+        }
+
+        var unlinkedMetric = metrics.FirstOrDefault(metric =>
+            !metricLinks.Any(link => string.Equals(link.MetricName, metric.Name, StringComparison.OrdinalIgnoreCase)));
+        if (unlinkedMetric != null)
+        {
+            status = $"Показатель «{RuText.Fix(unlinkedMetric.Name)}» должен быть связан хотя бы с одной шкалой.";
+            return false;
+        }
+
+        foreach (var metric in metrics)
+        {
+            var sum = MetricWeightSum(metric.Name);
+            if (Math.Abs(sum - 1m) > 0.001m)
+            {
+                status = $"Сумма весов шкал для показателя «{RuText.Fix(metric.Name)}» должна быть равна 1. Сейчас: {sum:0.##}.";
+                return false;
+            }
+        }
+
+        if (questions.Any(question => !scaleNames.Contains(question.ScaleName.Trim())))
+        {
+            status = "Каждый вопрос должен быть привязан к существующей шкале теста.";
             return false;
         }
 
@@ -347,11 +723,26 @@ else
         }
 
         scales.Add(new() { Name = "Тревожность", Description = "Субъективное напряжение и частые переживания" });
+        scales.Add(new() { Name = "Учебная нагрузка", Description = "Ощущение перегрузки задачами и сроками" });
         scales.Add(new() { Name = "Поддержка группы", Description = "Ощущение помощи и принятия", IsPositive = true });
-        metrics.Add(new() { Name = "Индекс тревожности", Description = "Групповой уровень тревожности", ScaleName = scales[0].Name });
-        metrics.Add(new() { Name = "Индекс поддержки", Description = "Позитивная поддержка в группе", IsPositive = true, ScaleName = scales[1].Name });
+        metrics.Add(new() { Name = "Индекс стресса", Description = "Групповой уровень напряжения" });
+        metrics.Add(new() { Name = "Индекс благополучия", Description = "Позитивное состояние группы", IsPositive = true });
+        metricLinks.Add(new() { ScaleName = "Тревожность", MetricName = "Индекс стресса", Weight = 0.6m });
+        metricLinks.Add(new() { ScaleName = "Учебная нагрузка", MetricName = "Индекс стресса", Weight = 0.4m });
+        metricLinks.Add(new() { ScaleName = "Поддержка группы", MetricName = "Индекс благополучия", Weight = 1m });
         questions.Add(CreateQuestion("В последние дни я часто испытываю тревогу из-за учебы.", scales[0].Name));
-        questions.Add(CreateQuestion("Я чувствую поддержку со стороны одногруппников.", scales[1].Name));
+        questions.Add(CreateQuestion("Учебные задачи в последние дни казались мне чрезмерными.", scales[1].Name));
+        questions.Add(CreateQuestion("Я чувствую поддержку со стороны одногруппников.", scales[2].Name));
+    }
+
+    private void ResetDraft()
+    {
+        testTitle = "Опрос состояния учебной группы";
+        scales.Clear();
+        metrics.Clear();
+        metricLinks.Clear();
+        questions.Clear();
+        SeedDraft();
     }
 
     private static QuestionDraft CreateQuestion(string text, string scaleName) => new()
@@ -360,14 +751,66 @@ else
         ScaleName = scaleName,
         Answers =
         [
-            new() { Text = "Совсем не согласен(на)", Value = 0m },
-            new() { Text = "Скорее не согласен(на)", Value = 0.33m },
-            new() { Text = "Скорее согласен(на)", Value = 0.66m },
-            new() { Text = "Полностью согласен(на)", Value = 1m }
+            new() { Text = "Совсем не согласен(на)", Value = -2m },
+            new() { Text = "Скорее не согласен(на)", Value = -1m },
+            new() { Text = "Затрудняюсь ответить", Value = 0m },
+            new() { Text = "Скорее согласен(на)", Value = 1m },
+            new() { Text = "Полностью согласен(на)", Value = 2m }
         ]
     };
 
-    private void AddScale() => scales.Add(new() { Name = $"Новая шкала {scales.Count + 1}" });
+    private void AddScale()
+    {
+        scales.Add(new() { Name = $"Новая шкала {scales.Count + 1}" });
+        EnsureMetricLinks();
+    }
+
+    private void RenameScale(ScaleDraft scale, string newName)
+    {
+        var oldName = scale.Name;
+        scale.Name = newName;
+        if (string.IsNullOrWhiteSpace(oldName))
+        {
+            return;
+        }
+
+        foreach (var question in questions.Where(question => question.ScaleName == oldName))
+        {
+            question.ScaleName = newName;
+        }
+
+        foreach (var link in metricLinks.Where(link => link.ScaleName == oldName))
+        {
+            link.ScaleName = newName;
+        }
+    }
+
+    private void ReuseScale()
+    {
+        var scale = scaleCatalog.FirstOrDefault(scale => scale.ScaleId == selectedScaleId);
+        if (scale == null)
+        {
+            status = "Выберите шкалу из каталога.";
+            return;
+        }
+
+        if (scales.Any(existing => string.Equals(existing.Name, scale.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            status = "Эта шкала уже добавлена в тест.";
+            return;
+        }
+
+        scales.Add(new ScaleDraft
+        {
+            Name = RuText.Fix(scale.Name),
+            Description = RuText.Fix(scale.Description),
+            IsPositive = scale.IsPositive
+        });
+
+        selectedScaleId = 0;
+        status = null;
+        EnsureMetricLinks();
+    }
 
     private void RemoveScale(ScaleDraft scale)
     {
@@ -378,32 +821,123 @@ else
         }
 
         scales.Remove(scale);
-        foreach (var metric in metrics.Where(metric => metric.ScaleName == scale.Name))
-        {
-            metric.ScaleName = scales.First().Name;
-        }
+        metricLinks.RemoveAll(link => link.ScaleName == scale.Name);
         foreach (var question in questions.Where(question => question.ScaleName == scale.Name))
         {
             question.ScaleName = scales.First().Name;
         }
+        EnsureMetricLinks();
     }
 
-    private void AddMetric() => metrics.Add(new()
+    private void AddMetric()
     {
-        Name = $"Новая метрика {metrics.Count + 1}",
-        ScaleName = scales.FirstOrDefault()?.Name ?? string.Empty
-    });
+        metrics.Add(new()
+        {
+            Name = $"Новый показатель {metrics.Count + 1}"
+        });
+        EnsureMetricLinks();
+    }
+
+    private void RenameMetric(MetricDraft metric, string newName)
+    {
+        var oldName = metric.Name;
+        metric.Name = newName;
+        if (string.IsNullOrWhiteSpace(oldName))
+        {
+            return;
+        }
+
+        foreach (var link in metricLinks.Where(link => link.MetricName == oldName))
+        {
+            link.MetricName = newName;
+        }
+    }
+
+    private void ReuseMetric()
+    {
+        var metric = metricCatalog.FirstOrDefault(metric => metric.MetricId == selectedMetricId);
+        if (metric == null)
+        {
+            status = "Выберите показатель из каталога.";
+            return;
+        }
+
+        if (metrics.Any(existing => string.Equals(existing.Name, metric.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            status = "Этот показатель уже добавлен в тест.";
+            return;
+        }
+
+        metrics.Add(new MetricDraft
+        {
+            Name = RuText.Fix(metric.Name),
+            Description = RuText.Fix(metric.Description),
+            IsPositive = metric.IsPositive
+        });
+
+        selectedMetricId = 0;
+        status = null;
+        EnsureMetricLinks();
+    }
 
     private void RemoveMetric(MetricDraft metric)
     {
         if (metrics.Count <= 1)
         {
-            status = "В тесте должна остаться хотя бы одна метрика.";
+            status = "В тесте должен остаться хотя бы один показатель мониторинга.";
             return;
         }
 
         metrics.Remove(metric);
+        metricLinks.RemoveAll(link => link.MetricName == metric.Name);
+        EnsureMetricLinks();
     }
+
+    private void AddMetricLink()
+    {
+        if (scales.Count == 0 || metrics.Count == 0)
+        {
+            status = "Добавьте хотя бы одну шкалу и один показатель мониторинга.";
+            return;
+        }
+
+        var metric = metrics.FirstOrDefault(metric => MetricWeightSum(metric.Name) < 1m) ?? metrics.First();
+        var remaining = 1m - MetricWeightSum(metric.Name);
+        metricLinks.Add(new MetricLinkDraft
+        {
+            ScaleName = scales.First().Name,
+            MetricName = metric.Name,
+            Weight = remaining > 0m ? decimal.Round(remaining, 2) : 0.5m
+        });
+        status = null;
+    }
+
+    private void RemoveMetricLink(MetricLinkDraft link)
+    {
+        metricLinks.Remove(link);
+    }
+
+    private void EnsureMetricLinks()
+    {
+        if (metricLinks.Count > 0 || scales.Count == 0 || metrics.Count == 0)
+        {
+            return;
+        }
+
+        metricLinks.Add(new MetricLinkDraft
+        {
+            ScaleName = scales[0].Name,
+            MetricName = metrics[0].Name,
+            Weight = 1m
+        });
+    }
+
+    private decimal MetricWeightSum(string metricName) => metricLinks
+        .Where(link => string.Equals(link.MetricName, metricName, StringComparison.OrdinalIgnoreCase))
+        .Sum(link => link.Weight);
+
+    private string MetricWeightBadgeClass(string metricName) =>
+        Math.Abs(MetricWeightSum(metricName) - 1m) <= 0.001m ? string.Empty : "badge-risk-high";
 
     private void AddQuestion() => questions.Add(CreateQuestion($"Новый вопрос {questions.Count + 1}", scales.FirstOrDefault()?.Name ?? string.Empty));
 
@@ -438,7 +972,13 @@ else
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public bool IsPositive { get; set; }
+    }
+
+    private sealed class MetricLinkDraft
+    {
         public string ScaleName { get; set; } = string.Empty;
+        public string MetricName { get; set; } = string.Empty;
+        public decimal Weight { get; set; } = 1m;
     }
 
     private sealed class QuestionDraft

@@ -50,11 +50,46 @@ namespace Psychometric_Test_Designer.Controllers
         }
 
         [Authorize(Policy = "TestManagement")]
+        [HttpPut("{testId}/full")]
+        public async Task<IActionResult> UpdateFullTest([FromRoute] int testId, [FromBody] CreateFullTestDto dto)
+        {
+            try
+            {
+                var test = await _testService.UpdateFullTest(testId, dto);
+                return Ok(test);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message,
+                    inner = ex.InnerException?.Message
+                });
+            }
+        }
+
+        [Authorize(Policy = "TestManagement")]
         [HttpGet]
         public async Task<IActionResult> GetAllTests()
         {
             var tests = await _testService.GetAllTests();
             return Ok(tests);
+        }
+
+        [Authorize(Policy = "TestManagement")]
+        [HttpGet("catalog/scales")]
+        public async Task<IActionResult> GetScales()
+        {
+            var scales = await _testService.GetScales();
+            return Ok(scales);
+        }
+
+        [Authorize(Policy = "TestManagement")]
+        [HttpGet("catalog/metrics")]
+        public async Task<IActionResult> GetMetrics()
+        {
+            var metrics = await _testService.GetMetrics();
+            return Ok(metrics);
         }
 
         [Authorize(Policy = "TestManagement")]
@@ -73,6 +108,21 @@ namespace Psychometric_Test_Designer.Controllers
             {
                 var assignment = await _testService.CreateAssignment(dto);
                 return Ok(assignment);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [Authorize(Policy = "TestManagement")]
+        [HttpPost("assignments/bulk")]
+        public async Task<IActionResult> CreateAssignments([FromBody] CreateTestAssignmentsDto dto)
+        {
+            try
+            {
+                var assignments = await _testService.CreateAssignments(dto);
+                return Ok(assignments);
             }
             catch (Exception ex)
             {

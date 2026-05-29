@@ -124,9 +124,7 @@ else
             <div class="modal-head">
                 <div>
                     <h2>@RuText.Fix(fullTest.Title)</h2>
-                    <p>Ответьте на все вопросы и отправьте тестирование.</p>
                 </div>
-                <button class="icon-button" type="button" title="Закрыть" @onclick="CloseModal">×</button>
             </div>
 
             <form @onsubmit="SubmitTest" @onsubmit:preventDefault>
@@ -169,6 +167,7 @@ else
     private List<TestAssignment> tests = new();
     private List<UserMetric> metrics = new();
     private FullTestResponse? fullTest;
+    private TestAssignment? activeAssignment;
     private ProcessTestResult? lastResult;
     private FeedbackResponse? feedbackResult;
     private string feedbackText = string.Empty;
@@ -205,6 +204,7 @@ else
     {
         answers.Clear();
         status = null;
+        activeAssignment = assignment;
         fullTest = await Api.GetFullTestAsync(assignment.TestId);
         showTestModal = fullTest != null;
         if (fullTest == null)
@@ -217,6 +217,7 @@ else
     {
         showTestModal = false;
         fullTest = null;
+        activeAssignment = null;
         answers.Clear();
     }
 
@@ -241,6 +242,7 @@ else
         busy = true;
         lastResult = await Api.SubmitCurrentUserTestAsync(new SubmitCurrentUserTest
         {
+            AssignmentId = activeAssignment?.AssignmentId ?? 0,
             TestId = fullTest.TestId,
             Answers = answers.Select(x => new SubmitAnswer { QuestionId = x.Key, AnswerId = x.Value }).ToList()
         });

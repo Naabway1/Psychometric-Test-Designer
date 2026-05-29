@@ -21,29 +21,23 @@
 }
 else
 {
-    <div class="grid cols-3">
-        @foreach (var group in summaries)
-        {
-            <section class="panel">
-                <h2>@RuText.Fix(group.GroupName)</h2>
-                <div class="metric">
-                    <span>Индекс риска</span>
-                    <strong>@Math.Round(group.RiskIndex, 1)</strong>
-                </div>
-                <div class="metric">
-                    <span>Уровень</span>
-                    <span class="badge">@RuText.RiskLabel(group.RiskLevel)</span>
-                </div>
-                <div class="metric">
-                    <span>Студентов</span>
-                    <strong>@group.UsersCount</strong>
-                </div>
-                <div class="button-row">
-                    <button class="btn-secondary" type="button" @onclick="() => SelectGroup(group.GroupId)">Открыть группу</button>
-                </div>
-            </section>
-        }
-    </div>
+    <section class="panel">
+        <div class="section-head">
+            <div>
+                <h2>Выбранная группа</h2>
+                <p class="muted">Здесь остаются только графики и таблицы по одной группе; общий рейтинг вынесен в раздел групп риска.</p>
+            </div>
+            <div class="field group-picker">
+                <label>Группа</label>
+                <select value="@selectedGroupId" @onchange="ChangeGroup">
+                    @foreach (var group in summaries)
+                    {
+                        <option value="@group.GroupId">@RuText.Fix(group.GroupName)</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </section>
 
     @if (selectedGroup != null)
     {
@@ -67,27 +61,29 @@ else
 
         <section class="panel" style="margin-top:14px">
             <h2>Средние показатели группы</h2>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Метрика</th>
-                        <th>Тип</th>
-                        <th>Среднее</th>
-                        <th>Студентов в расчете</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var metric in metrics)
-                    {
+            <div class="table-shell">
+                <table class="table table-fill">
+                    <thead>
                         <tr>
-                            <td>@RuText.Fix(metric.MetricName)</td>
-                            <td>@MetricType(metric.IsPositive)</td>
-                            <td>@Math.Round(metric.AverageValue, 1)</td>
-                            <td>@metric.UsersCount</td>
+                            <th>Метрика</th>
+                            <th>Тип</th>
+                            <th>Среднее</th>
+                            <th>Студентов в расчете</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var metric in metrics)
+                        {
+                            <tr>
+                                <td>@RuText.Fix(metric.MetricName)</td>
+                                <td>@MetricType(metric.IsPositive)</td>
+                                <td>@Math.Round(metric.AverageValue, 1)</td>
+                                <td>@metric.UsersCount</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </section>
     }
 }
@@ -105,6 +101,7 @@ else
     private List<GroupMetricHistoryPoint> history = new();
     private List<GroupScaleDistribution> distribution = new();
     private GroupRiskSummary? selectedGroup;
+    private int selectedGroupId;
     private string? status;
     private bool chartsPending;
 
@@ -116,6 +113,7 @@ else
             selectedGroup = summaries.FirstOrDefault();
             if (selectedGroup != null)
             {
+                selectedGroupId = selectedGroup.GroupId;
                 await LoadSelected();
             }
         }
@@ -130,8 +128,14 @@ else
         }
     }
 
-    private async Task SelectGroup(int groupId)
+    private async Task ChangeGroup(ChangeEventArgs args)
     {
+        if (!int.TryParse(args.Value?.ToString(), out var groupId))
+        {
+            return;
+        }
+
+        selectedGroupId = groupId;
         selectedGroup = summaries.FirstOrDefault(x => x.GroupId == groupId);
         await LoadSelected();
     }

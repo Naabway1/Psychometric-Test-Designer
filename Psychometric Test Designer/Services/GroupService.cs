@@ -149,6 +149,7 @@ namespace Psychometric_Test_Designer.Services
         public async Task<List<GroupRiskSummaryDto>> GetAllGroupRiskSummaries()
         {
             var groupIds = await _db.Groups
+                .Where(g => (g.StudentCount ?? 0) > 0)
                 .OrderBy(g => g.GroupName)
                 .Select(g => g.GroupId)
                 .ToListAsync();

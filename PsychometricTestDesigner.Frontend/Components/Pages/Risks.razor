@@ -55,8 +55,40 @@ else
                     <tr>
                         <td>@RuText.Fix(group.GroupName)</td>
                         <td>@Math.Round(group.RiskIndex, 1)</td>
-                        <td><span class="badge">@RuText.RiskLabel(group.RiskLevel)</span></td>
+                        <td><span class="badge @RiskBadgeClass(group.RiskLevel)">@RuText.RiskLabel(group.RiskLevel)</span></td>
                         <td>@ProblemMetrics(group)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel" style="margin-top:14px">
+        <h2>Сигналы внимания</h2>
+        <p class="chart-caption">В этой таблице объединены интегральный риск группы и отдельные метрики, которые превысили рабочие пороги. Она заменяет отдельный раздел сигналов внимания.</p>
+        @if (VisibleAlerts.Count == 0)
+        {
+            <p>Сейчас нет активных сигналов по настроенным порогам.</p>
+        }
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Группа</th>
+                    <th>Сигнал</th>
+                    <th>Значение</th>
+                    <th>Порог</th>
+                    <th>Уровень</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var alert in VisibleAlerts)
+                {
+                    <tr>
+                        <td>@RuText.Fix(alert.GroupName)</td>
+                        <td>@RuText.Fix(alert.MetricName)</td>
+                        <td>@Math.Round(alert.CurrentValue, 1)</td>
+                        <td>@Math.Round(alert.Threshold, 1)</td>
+                        <td><span class="badge @SeverityBadgeClass(alert.Severity)">@RuText.SeverityLabel(alert.Severity)</span></td>
                     </tr>
                 }
             </tbody>
@@ -66,23 +98,84 @@ else
 
 @code {
     private List<GroupRiskSummary> summaries = new();
+    private List<TriggerAlert> apiAlerts = new();
+
+    private List<TriggerAlert> VisibleAlerts
+    {
+        get
+        {
+            var alerts = apiAlerts
+                .Select(x => new TriggerAlert
+                {
+                    GroupId = x.GroupId,
+                    GroupName = RuText.Fix(x.GroupName),
+                    MetricName = RuText.Fix(x.MetricName),
+                    CurrentValue = x.CurrentValue,
+                    Threshold = x.Threshold,
+                    Severity = NormalizeSeverity(x.Severity),
+                    Message = RuText.Fix(x.Message)
+                })
+                .ToList();
+
+            alerts.AddRange(summaries
+                .Where(x => x.RiskIndex >= 40)
+                .Select(x => new TriggerAlert
+                {
+                    GroupId = x.GroupId,
+                    GroupName = RuText.Fix(x.GroupName),
+                    MetricName = "Интегральный риск",
+                    CurrentValue = x.RiskIndex,
+                    Threshold = x.RiskIndex >= 75 ? 75 : x.RiskIndex >= 60 ? 60 : 40,
+                    Severity = NormalizeSeverity(x.RiskLevel),
+                    Message = string.Empty
+                }));
+
+            return alerts
+                .GroupBy(x => $"{x.GroupId}:{x.MetricName}")
+                .Select(g => g.OrderByDescending(x => SeverityRank(x.Severity)).ThenByDescending(x => x.CurrentValue).First())
+                .OrderByDescending(x => SeverityRank(x.Severity))
+                .ThenByDescending(x => x.CurrentValue)
+                .ToList();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
         if (Auth.IsPsychologist)
         {
             summaries = await Api.GetRiskSummariesAsync();
+            apiAlerts = await Api.GetAlertsAsync();
         }
     }
 
     private static string ProblemMetrics(GroupRiskSummary group)
     {
         var metrics = group.Metrics
-            .OrderByDescending(x => x.AverageValue)
+            .OrderByDescending(x => x.IsPositive ? 100m - x.AverageValue : x.AverageValue)
             .Take(3)
             .Select(x => $"{RuText.Fix(x.MetricName)}: {Math.Round(x.AverageValue, 1)}");
 
         return string.Join("; ", metrics);
     }
+
+    private static string NormalizeSeverity(string? severity) => severity?.ToLowerInvariant() switch
+    {
+        "critical" => "critical",
+        "high" or "warning" => "high",
+        "medium" => "medium",
+        _ => "low"
+    };
+
+    private static int SeverityRank(string? severity) => NormalizeSeverity(severity) switch
+    {
+        "critical" => 4,
+        "high" => 3,
+        "medium" => 2,
+        _ => 1
+    };
+
+    private static string RiskBadgeClass(string? level) => $"badge-risk-{NormalizeSeverity(level)}";
+
+    private static string SeverityBadgeClass(string? severity) => $"badge-risk-{NormalizeSeverity(severity)}";
 }
 

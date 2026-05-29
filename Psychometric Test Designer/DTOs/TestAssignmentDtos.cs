@@ -8,6 +8,14 @@ namespace Psychometric_Test_Designer.DTOs
         public DateTime ClosesAt { get; set; }
     }
 
+    public class CreateTestAssignmentsDto
+    {
+        public int TestId { get; set; }
+        public List<int> GroupIds { get; set; } = new();
+        public DateTime OpensAt { get; set; }
+        public DateTime ClosesAt { get; set; }
+    }
+
     public class TestAssignmentDto
     {
         public int AssignmentId { get; set; }

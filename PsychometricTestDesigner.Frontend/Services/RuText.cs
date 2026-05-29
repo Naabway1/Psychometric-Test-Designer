@@ -74,7 +74,10 @@ public static class RuText
     public static string SeverityLabel(string? value) => value?.ToLowerInvariant() switch
     {
         "critical" => "Критично",
-        "warning" => "Предупреждение",
+        "high" => "Высокий",
+        "warning" => "Высокий",
+        "medium" => "Средний",
+        "low" => "Низкий",
         _ => "Информация"
     };
 

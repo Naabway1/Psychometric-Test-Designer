@@ -189,6 +189,26 @@ namespace Psychometric_Test_Designer.Controllers
             return await GetScaleResults(userId.Value);
         }
 
+        [HttpGet("me/latest-test-result")]
+        public async Task<IActionResult> GetMyLatestTestResult()
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+            {
+                return Unauthorized();
+            }
+
+            try
+            {
+                var result = await _userService.GetLatestTestResult(userId.Value);
+                return Ok(result ?? new ProcessTestResultDto { UserId = userId.Value });
+            }
+            catch (Exception ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
         [HttpGet("{userId}/scale-results")]
         public async Task<IActionResult> GetScaleResults([FromRoute] int userId)
         {

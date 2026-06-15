@@ -174,6 +174,97 @@ namespace Psychometric_Test_Designer.Services
                 .ToListAsync();
         }
 
+        public async Task<ProcessTestResultDto?> GetLatestTestResult(int userId)
+        {
+            var userExists = await _db.Users.AnyAsync(u => u.UserId == userId);
+            if (!userExists)
+            {
+                throw new Exception("Пользователь не найден");
+            }
+
+            var latestScaleRun = await _db.UserScaleResults
+                .AsNoTracking()
+                .Where(result => result.UserId == userId)
+                .OrderByDescending(result => result.CreatedAt)
+                .Select(result => new
+                {
+                    result.SourceTestId,
+                    result.CreatedAt
+                })
+                .FirstOrDefaultAsync();
+
+            if (latestScaleRun == null)
+            {
+                return null;
+            }
+
+            var scales = await _db.UserScaleResults
+                .AsNoTracking()
+                .Where(result =>
+                    result.UserId == userId
+                    && result.SourceTestId == latestScaleRun.SourceTestId
+                    && result.CreatedAt == latestScaleRun.CreatedAt)
+                .OrderBy(result => result.ScaleId)
+                .Select(result => new ProcessedScaleResultDto
+                {
+                    ScaleId = result.ScaleId,
+                    ScaleName = result.Scale.Name,
+                    IsPositive = result.Scale.IsPositive,
+                    RawScore = result.RawScore,
+                    NormalizedScore = result.NormalizedScore
+                })
+                .ToListAsync();
+
+            var latestMetricCreatedAt = await _db.UserMetricSnapshots
+                .AsNoTracking()
+                .Where(snapshot =>
+                    snapshot.UserId == userId
+                    && snapshot.SourceTestId == latestScaleRun.SourceTestId
+                    && snapshot.CreatedAt <= latestScaleRun.CreatedAt)
+                .OrderByDescending(snapshot => snapshot.CreatedAt)
+                .Select(snapshot => (DateTime?)snapshot.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            latestMetricCreatedAt ??= await _db.UserMetricSnapshots
+                .AsNoTracking()
+                .Where(snapshot =>
+                    snapshot.UserId == userId
+                    && snapshot.SourceTestId == latestScaleRun.SourceTestId)
+                .OrderByDescending(snapshot => snapshot.CreatedAt)
+                .Select(snapshot => (DateTime?)snapshot.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            var metrics = latestMetricCreatedAt.HasValue
+                ? await _db.UserMetricSnapshots
+                    .AsNoTracking()
+                    .Where(snapshot =>
+                        snapshot.UserId == userId
+                        && snapshot.SourceTestId == latestScaleRun.SourceTestId
+                        && snapshot.CreatedAt == latestMetricCreatedAt.Value)
+                    .OrderBy(snapshot => snapshot.MetricId)
+                    .Select(snapshot => new ProcessedMetricResultDto
+                    {
+                        MetricId = snapshot.MetricId,
+                        MetricName = snapshot.Metric.Name,
+                        IsPositive = snapshot.Metric.IsPositive,
+                        CurrentValue = snapshot.Value,
+                        EmaValue = _db.UserMetrics
+                            .Where(metric => metric.UserId == userId && metric.MetricId == snapshot.MetricId)
+                            .Select(metric => metric.Value)
+                            .FirstOrDefault()
+                    })
+                    .ToListAsync()
+                : new List<ProcessedMetricResultDto>();
+
+            return new ProcessTestResultDto
+            {
+                UserId = userId,
+                TestId = latestScaleRun.SourceTestId,
+                Scales = scales,
+                Metrics = metrics
+            };
+        }
+
         public async Task<List<StudentResultSummaryDto>> GetGroupStudentResults(int groupId)
         {
             var groupExists = await _db.Groups.AnyAsync(g => g.GroupId == groupId);

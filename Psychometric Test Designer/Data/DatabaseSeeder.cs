@@ -9,7 +9,7 @@ namespace Psychometric_Test_Designer.Data
     {
         private const string SeedVersion = "2026-05-29-scale-metric-aggregation";
         private const string SeedVersionKey = "demo_seed_version";
-        private const string StaffGroupName = "Администрация колледжа";
+        private const string StaffGroupName = "АДМ.";
 
         private static readonly string[] TargetGroups =
         [

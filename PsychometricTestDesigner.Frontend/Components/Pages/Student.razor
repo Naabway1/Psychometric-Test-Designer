@@ -56,17 +56,24 @@ else
         <section class="panel">
             <h2>Последний результат теста</h2>
             <p class="muted">Показывает именно последнее прохождение без EMA-сглаживания.</p>
-            @if (lastResult == null)
+            @if (!HasLastResult)
             {
                 <p>После отправки теста здесь появятся рассчитанные показатели.</p>
             }
             else
             {
-                @foreach (var metric in lastResult.Metrics)
+                @foreach (var metric in lastResult!.Metrics)
                 {
                     <div class="metric">
                         <span>@RuText.Fix(metric.MetricName)</span>
                         <strong>@Math.Round(metric.CurrentValue, 1)</strong>
+                    </div>
+                }
+                @foreach (var scale in lastResult.Scales)
+                {
+                    <div class="metric">
+                        <span>@RuText.Fix(scale.ScaleName)</span>
+                        <strong>@Math.Round(scale.NormalizedScore * 100, 1)</strong>
                     </div>
                 }
             }
@@ -175,6 +182,8 @@ else
     private bool busy;
     private bool chartsPending;
     private bool showTestModal;
+    private bool HasLastResult => lastResult != null
+        && (lastResult.Metrics.Count > 0 || lastResult.Scales.Count > 0);
 
     protected override async Task OnInitializedAsync()
     {
@@ -196,7 +205,25 @@ else
     private async Task LoadData()
     {
         tests = await Api.GetAvailableTestsAsync();
+        var testsError = Api.LastError;
         metrics = await Api.GetMyMetricsAsync();
+        var metricsError = Api.LastError;
+        lastResult = await Api.GetMyLatestTestResultAsync();
+        var latestResultError = Api.LastError;
+
+        if (!string.IsNullOrWhiteSpace(testsError))
+        {
+            status = testsError;
+        }
+        else if (!string.IsNullOrWhiteSpace(metricsError))
+        {
+            status = metricsError;
+        }
+        else if (!string.IsNullOrWhiteSpace(latestResultError))
+        {
+            status = latestResultError;
+        }
+
         chartsPending = true;
     }
 

@@ -15,7 +15,6 @@
     @if (Auth.IsStudent)
     {
         <NavLink class="nav-link" href="student">Личный кабинет</NavLink>
-        <NavLink class="nav-link" href="feedback">Обратная связь</NavLink>
     }
 
     @if (Auth.IsPsychologist)
@@ -54,4 +53,3 @@
         Auth.Changed -= StateHasChanged;
     }
 }
-

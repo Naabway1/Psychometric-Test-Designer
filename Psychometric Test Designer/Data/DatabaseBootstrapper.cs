@@ -18,7 +18,7 @@ namespace Psychometric_Test_Designer.Data
 
                 ALTER TABLE user_metric_snapshots
                 ADD COLUMN IF NOT EXISTS source_test_id INT REFERENCES tests(test_id),
-                ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+                ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
                 ALTER TABLE scales
                 ADD COLUMN IF NOT EXISTS is_positive BOOLEAN NOT NULL DEFAULT FALSE;
@@ -54,22 +54,57 @@ namespace Psychometric_Test_Designer.Data
                     text TEXT NOT NULL,
                     sentiment_score NUMERIC NOT NULL DEFAULT 0,
                     topics TEXT,
-                    created_at TIMESTAMP DEFAULT NOW()
+                    created_at TIMESTAMPTZ DEFAULT NOW()
                 );
 
                 CREATE TABLE IF NOT EXISTS test_assignments (
                     assignment_id SERIAL PRIMARY KEY,
                     test_id INT NOT NULL REFERENCES tests(test_id) ON DELETE CASCADE,
                     group_id INT NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
-                    opens_at TIMESTAMP NOT NULL,
-                    closes_at TIMESTAMP NOT NULL,
-                    created_at TIMESTAMP DEFAULT NOW()
+                    opens_at TIMESTAMPTZ NOT NULL,
+                    closes_at TIMESTAMPTZ NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
                 );
 
                 CREATE TABLE IF NOT EXISTS app_seed_state (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 );
+
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'created_at' AND data_type = 'timestamp without time zone') THEN
+                        ALTER TABLE users ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+                    END IF;
+
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tests' AND column_name = 'created_at' AND data_type = 'timestamp without time zone') THEN
+                        ALTER TABLE tests ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+                    END IF;
+
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'user_scale_results' AND column_name = 'created_at' AND data_type = 'timestamp without time zone') THEN
+                        ALTER TABLE user_scale_results ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+                    END IF;
+
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'user_metric_snapshots' AND column_name = 'created_at' AND data_type = 'timestamp without time zone') THEN
+                        ALTER TABLE user_metric_snapshots ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+                    END IF;
+
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'text_feedback' AND column_name = 'created_at' AND data_type = 'timestamp without time zone') THEN
+                        ALTER TABLE text_feedback ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+                    END IF;
+
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'test_assignments' AND column_name = 'opens_at' AND data_type = 'timestamp without time zone') THEN
+                        ALTER TABLE test_assignments ALTER COLUMN opens_at TYPE TIMESTAMPTZ USING opens_at AT TIME ZONE 'UTC';
+                    END IF;
+
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'test_assignments' AND column_name = 'closes_at' AND data_type = 'timestamp without time zone') THEN
+                        ALTER TABLE test_assignments ALTER COLUMN closes_at TYPE TIMESTAMPTZ USING closes_at AT TIME ZONE 'UTC';
+                    END IF;
+
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'test_assignments' AND column_name = 'created_at' AND data_type = 'timestamp without time zone') THEN
+                        ALTER TABLE test_assignments ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+                    END IF;
+                END $$;
                 """);
         }
     }

@@ -89,6 +89,9 @@ public sealed class ApiClient
     public Task<List<UserScaleResult>> GetMyScaleResultsAsync() =>
         GetListAsync<UserScaleResult>("api/users/me/scale-results");
 
+    public Task<ProcessTestResult?> GetMyLatestTestResultAsync() =>
+        GetAsync<ProcessTestResult>("api/users/me/latest-test-result");
+
     public Task<ProcessTestResult?> SubmitCurrentUserTestAsync(SubmitCurrentUserTest request) =>
         PostAsync<SubmitCurrentUserTest, ProcessTestResult>("api/test-processing/submit/me", request);
 
